@@ -26,8 +26,17 @@ interface = {
       }
     },
     dummy = {
-      resulttype = "void",
+      resulttype = "int",
       args = {
+        {direction = "in", type = "int"},
+        {direction = "in", type = "int"},
+        {direction = "in", type = "int"}
+      }
+    },
+    easy = {
+      resulttype = "string",
+      args = {
+        {direction = "in", type = "string"},
         {direction = "in", type = "string"},
       }
     }

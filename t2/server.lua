@@ -12,13 +12,15 @@ local luarpc = require("luarpc")
 local myobj1 = { 
   foo = function (a, s, st, n) return a*2, string.len(s) + st.idade + n end, 
   boo = function (n) return n end,
-  dummy = function (s1,s2,s3,s4) return s1+s2+s3+s4 end
+  dummy = function (s1,s2,s3) return s1*s2*s3 end,
+  easy = function (s1,s2) return s1..s2 end
 }
 
 local myobj2 = { 
   foo = function (a, s, st, n) return a*2, string.len(s) + st.idade + n end, 
   boo = function (n) return n end,
-  dummy = function (s) print(s) end
+  dummy = function (s1,s2,s3) return s1+s2+s3 end,
+  easy = function (s1,s2) return s1..s2 end
 }
 
 
