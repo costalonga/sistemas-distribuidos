@@ -1,4 +1,4 @@
-struct = { 
+struct = {
   name = "minhaStruct",
   fields = {
     {name = "nome", type = "string"},
@@ -38,6 +38,7 @@ interface = {
       args = {
         {direction = "in", type = "string"},
         {direction = "in", type = "string"},
+        {direction = "in", type = "int"},
       }
     }
   }
