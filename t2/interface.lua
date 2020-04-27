@@ -8,7 +8,6 @@ struct = {
 }
 
 interface = {
-  name = "minhaInt",
   methods = {
     foo = {
       resulttype = "double",
@@ -24,28 +23,22 @@ interface = {
       args = {
         {direction = "inout", type = "double"},
       }
-    },
-    dummy = {
-      resulttype = "int",
-      args = {
-        {direction = "in", type = "int"},
-        {direction = "in", type = "int"},
-        {direction = "in", type = "int"}
-      }
-    },
-    easy = {
-      resulttype = "string",
-      args = {
-        {direction = "in", type = "string"},
-        {direction = "in", type = "string"},
-        {direction = "in", type = "int"},
-      }
     }
   }
 }
 
 --interface = {
+--  name = "minhaInt",
 --  methods = {
+--    foo = {
+--      resulttype = "double",
+--      args = {
+--        {direction = "in", type = "double"},
+--        {direction = "in", type = "string"},
+--        {direction = "in", type = "minhaStruct"},
+--        {direction = "inout", type = "int"}
+--      }
+--    },
 --    boo = {
 --      resulttype = "void",
 --      args = {
@@ -53,9 +46,19 @@ interface = {
 --      }
 --    },
 --    dummy = {
---      resulttype = "void",
+--      resulttype = "int",
+--      args = {
+--        {direction = "in", type = "int"},
+--        {direction = "in", type = "int"},
+--        {direction = "in", type = "int"}
+--      }
+--    },
+--    easy = {
+--      resulttype = "string",
 --      args = {
 --        {direction = "in", type = "string"},
+--        {direction = "in", type = "string"},
+--        {direction = "in", type = "int"},
 --      }
 --    }
 --  }

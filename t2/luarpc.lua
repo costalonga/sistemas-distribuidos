@@ -19,9 +19,7 @@ local clients_lst = {} -- Table/Dict for clients
 -------------------------------------------------------------------------------- Main Functions
 function luarpc.createServant(obj, interface_path, port)
   local server = socket.try(socket.bind("*", port))
---    local ip, port = server:getsockname() Redundant
   print("Server is running on port: " .. port)
-
   table.insert(sockets_lst, server) -- insert at socket_lst
   servants_lst[server] = {}
   servants_lst[server]["obj"] = obj
@@ -32,44 +30,53 @@ end
 function luarpc.createProxy(host, port, interface_path)
   local proxy_stub = {}
   dofile(interface_path)
---  TODO: Validate: obj
   for fname, fmethod in pairs(interface.methods) do
     proxy_stub[fname] = function(self, ...)
-      params = {...} -- TODO usar do args[2] em diante args[1] é uma tab
+      params = {...}
 
---      local isValid, params = luarpc.validate_client() -- TODO implement
---      if isValid then
---        local msg = interface
---      end
-
-    proxy_stub.conn = socket.connect(host, port)
-    proxy_stub.conn:setoption("tcp-nodelay", true)
-    proxy_stub.conn:settimeout(2)
-    proxy_stub.conn:setoption("keepalive", true)
-    proxy_stub.conn:setoption("reuseaddr", true)
-
-    local msg = luarpc.marshalling(params)
-    msg = fname .. "\n" .. msg
-    -- print("\n\t\tGONNA SEND [PROXY]: ",msg)
-    self.conn:send(msg)
-    local ack,err
-    local returns = {}
-    repeat
-      ack,err = self.conn:receive()
-      if err then
-        print("[ERROR]", err)
-        break
+      local swagger_struct = {} -- converting to math.types
+      for i=1,#struct.fields do
+        local tmp_type = struct.fields[i].type
+        if tmp_type == "double" then
+           tmp_type = "float"
+        elseif tmp_type == "int" then
+          tmp_type = "integer"
+        end
+        swagger_struct[struct.fields[i].name] = tmp_type
       end
-      if ack ~= nil and ack ~= "-fim-" then
-        table.insert(returns,ack)
-        -- print("\n\t\tMESSAGE INFO [PROXY]:",ack,err,"\n")
+      local isValid, params = luarpc.validate_client(params,fname,fmethod.args,swagger_struct)
+      if not isValid then
+        return "[ERROR] Invalid request, check prints"
       end
-    until ack == "-fim-"
-    proxy_stub.conn:close()
-    local res = luarpc.unmarshalling(returns, interface_path)
-    return table.unpack(res)
+
+      proxy_stub.conn = socket.connect(host, port)
+      proxy_stub.conn:setoption("tcp-nodelay", true)
+      proxy_stub.conn:settimeout(2)
+      proxy_stub.conn:setoption("keepalive", true)
+      proxy_stub.conn:setoption("reuseaddr", true)
+
+      local msg = luarpc.marshalling(params)
+      msg = fname .. "\n" .. msg
+      -- print("\n\t\tGONNA SEND [PROXY]: ",msg)
+      self.conn:send(msg)
+      local ack,err
+      local returns = {}
+      repeat
+        ack,err = self.conn:receive()
+        if err then
+          print("[ERROR]", err)
+          break
+        end
+        if ack ~= nil and ack ~= "-fim-" then
+          table.insert(returns,ack)
+          -- print("\n\t\tMESSAGE INFO [PROXY]:",ack,err,"\n")
+        end
+      until ack == "-fim-"
+      proxy_stub.conn:close()
+      local res = luarpc.unmarshalling(returns, interface_path)
+      return table.unpack(res)
     end --end of function
-  end
+  end -- end of for
 --  proxy_stub.conn = socket.connect(host, port)
   return proxy_stub
 end
@@ -282,21 +289,80 @@ function luarpc.print_tables(obj)
   print("\n")
 end
 
-function luarpc.validate_client()
-  return true
+function luarpc.validate_client(params,fname,iface_args,swagger_struct)
+  local valid = true
+  local inputs = {}
+  for i=1,#iface_args do
+    local arg_direc = iface_args[i].direction
+    if arg_direc == "in" or arg_direc == "inout" then
+      local arg_type = iface_args[i].type
+      table.insert(inputs,arg_type)
+    end
+  end
+  if not (#params == #inputs) then
+    local reason = string.format("Method '%s' should receive %i args, but only receive %i",fname,#inputs,#params)
+    print("[ERROR] Invalid request! " .. reason)
+    valid = false
+  else
+    for i=1,#inputs do
+      if inputs[i] == "int" or inputs[i] == "double" then -- number case
+        local inner_valid = true
+        if type(params[i]) ~= "number" then
+          local tmp = tonumber(params[i])
+          if tmp == nil then
+            local reason = string.format("#%i arg of method '%s' must be a valid number format and not %s",i,fname,type(params[i]))
+            print("[ERROR] Invalid request! " .. reason)
+            valid = false
+            inner_valid = false
+          else
+            params[i] = tmp
+          end
+        end
+        if inner_valid then
+          if math.type(params[i]) == "integer" and inputs[i] == "double" then -- convert int to double
+            params[i] = params[i] + .0
+          elseif math.type(params[i]) == "float" and inputs[i] == "int" then -- convert double to int
+            params[i] = math.floor(params[i])
+          end
+        end
+      elseif inputs[i] == "string" then -- string case
+        if type(params[i]) ~= "string" and type(params[i]) ~= "number" then
+          local reason = string.format("#%i arg of method '%s' must be a valid string, can't convert %s to string...",i,fname,type(params[i]))
+          print("[ERROR] Invalid request! " .. reason)
+          valid = false
+        else
+          params[i] = tostring(params[i])
+        end
+      elseif inputs[i] == "minhaStruct" then -- table case
+        local reason = ""
+        if type(params[i]) ~= "table" then
+          reason = string.format("#%i arg of method '%s' must be a table and not %s",i,fname,type(params[i]))
+        else
+          if type(params[i].nome) ~= swagger_struct.nome then
+            reason = reason .. string.format("\n  #%i arg of method '%s' must be a table with 'name' of type string and not %s",i,fname,type(params[i].nome))
+          end
+          params[i].peso = tonumber(params[i].peso)
+          if math.type(params[i].peso) ~= swagger_struct.peso then
+            reason = reason .. string.format("\n  #%i arg of method '%s' must be a table with 'peso' of type double and not %s",i,fname,type(params[i].peso))
+          end
+          params[i].idade = tonumber(params[i].idade)
+          if math.type(params[i].idade) ~= swagger_struct.idade then
+            reason = reason .. string.format("\n  #%i arg of method '%s' must be a table with 'idade' of type int and not %s",i,fname,type(params[i].idade))
+          end
+        end
+        if #reason > 0 then
+          print("[ERROR] Invalid request! " .. reason)
+          valid = false
+        end
+      else -- invalid
+        local reason = string.format("#%i arg of method '%s' has type %s not supported",i,fname,type(params[i]))
+        print("[ERROR] Invalid request! " .. reason)
+        valid = false
+      end
+    end
+  end
+  return valid, params
 end
-
--------------------------------------------------------------------------------------------------
-
-function luarpc.marshling_params() -- Packing parameters into a message
-  print("pass")
-end
-
-function luarpc.unmarshling_params() -- Unpacking parameters from a message
-  print("pass")
-end
-
-
 
 -------------------------------------------------------------------------------- Return RPC
 return luarpc
