@@ -1,25 +1,25 @@
 local luarpc = require("luarpc")
 
---local myobj1 = {
+-- local myobj1 = {
 --  foo = function (a, s, st, n) return a*2, string.len(s) + st.idade + n end,
 --  boo = function (n) return n end
---}
---local myobj2 = {
+-- }
+-- local myobj2 = {
 --  foo = function (a, s, st, n) return 0.0, 1 end,
---  boo = function (n) return 1 end
---}
+--  boo = function (n) return n end
+-- }
 
 local myobj1 = {
   foo = function (a, s, st, n) return a*2, string.len(s) + st.idade + n end,
---  dummy = function (s1,s2,s3) return s1*s2*s3 end,
---  easy = function (s1,s2,s3) return s1..s2.. tostring(s3) end,
+  dummy = function (s1,s2,s3) return s1*s2*s3 end,
+  easy = function (s1,s2,s3) return s1..s2.. tostring(s3) end,
   boo = function (n) return n end
 }
 
 local myobj2 = {
   foo = function (a, s, st, n) return a*2, string.len(s) + st.idade + n end,
---  dummy = function (s1,s2,s3) return s1+s2+s3 end,
---  easy = function (s1,s2,s3) return s1..s2.. tostring(s3) end,
+  dummy = function (s1,s2,s3) return s1+s2+s3 end,
+  easy = function (s1,s2,s3) return s1..s2.. tostring(s3) end,
   boo = function (n) return n end
 }
 

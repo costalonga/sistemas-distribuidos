@@ -49,11 +49,11 @@ function luarpc.createProxy(host, port, interface_path)
         return "[ERROR] Invalid request, check prints"
       end
 
-      proxy_stub.conn = socket.connect(host, port)
-      proxy_stub.conn:setoption("tcp-nodelay", true)
-      proxy_stub.conn:settimeout(2)
-      proxy_stub.conn:setoption("keepalive", true)
-      proxy_stub.conn:setoption("reuseaddr", true)
+      -- proxy_stub.conn = socket.connect(host, port)
+      -- proxy_stub.conn:setoption("tcp-nodelay", true)
+      -- proxy_stub.conn:settimeout(2)
+      -- proxy_stub.conn:setoption("keepalive", true)
+      -- proxy_stub.conn:setoption("reuseaddr", true)
 
       local msg = luarpc.marshalling(params)
       msg = fname .. "\n" .. msg
@@ -72,12 +72,17 @@ function luarpc.createProxy(host, port, interface_path)
           -- print("\n\t\tMESSAGE INFO [PROXY]:",ack,err,"\n")
         end
       until ack == "-fim-"
-      proxy_stub.conn:close()
+      -- proxy_stub.conn:close()
       local res = luarpc.unmarshalling(returns, interface_path)
       return table.unpack(res)
     end --end of function
   end -- end of for
---  proxy_stub.conn = socket.connect(host, port)
+  proxy_stub.conn = socket.connect(host, port)
+  proxy_stub.conn = socket.connect(host, port)
+  proxy_stub.conn:setoption("tcp-nodelay", true)
+  proxy_stub.conn:settimeout(2)
+  proxy_stub.conn:setoption("keepalive", true)
+  proxy_stub.conn:setoption("reuseaddr", true)
   return proxy_stub
 end
 
@@ -93,6 +98,7 @@ function luarpc.waitIncoming()
 --        print("\n\tSERVER SOCKET CASE\n")
         local servant = socket
         local client = assert(servant:accept())
+        -- print("\t\t >> NEW CLIENT:", client, "\n")
 --        print("\n\t\t\tCONNECTION ACCEPTED")
         client:settimeout(0.01)
         client:setoption("keepalive", true)
@@ -108,24 +114,28 @@ function luarpc.waitIncoming()
         local msg,err = client:receive()
 
         if err then
-          print("AN ERROR OCCURRED AT waitIncoming:client:receive",err)
+          if err == "closed" then
+            print("\t Connection closed! Removing client... ", msg, client)
+          else
+            print("AN ERROR OCCURRED AT waitIncoming:client:receive",err)
+          end
           luarpc.remove_socket(client,"c")
           break
         end
 
         if msg then
           if msg == "-fim-" then
-            print("\n\t\tALL MSG:",clients_lst[client]["request"], err, "\n")
-            luarpc.print_tables(clients_lst[client]["request"])
-            print("\n")
+            -- print(" End of message:",clients_lst[client]["request"], "\n")
+            -- luarpc.print_tables(clients_lst[client]["request"]) -- [print] here
+            -- print("\n")
             local result = luarpc.process_request(client)
-            -- luarpc.process_request(client)
-            print("\t\t >RES:",result)
-            -- client:send("OK\n")
+            print(string.format("Result of request, for client %s :",client))
+            print(result)
             client:send(result)
-            client:close()
-            luarpc.remove_socket(client,"c")
+            -- client:close()
+            -- luarpc.remove_socket(client,"c")
           else
+            -- print("\t\t >> PART MSG:",clients_lst[client]["request"], client, "\n")
             table.insert(clients_lst[client]["request"], msg)
           end
         end
@@ -138,15 +148,15 @@ end
 function luarpc.process_request(client)
   local request_msg = clients_lst[client]["request"]
   local func_name = table.remove(request_msg, 1) -- pop index 1
-  print("\t >> FNAME :",func_name)
+  print("\t >> FNAME :",func_name) -- [print] here
   -- print("\t >> SERVER:",clients_lst[client]["servant"])
   local servant = clients_lst[client]["servant"]
   -- print("\t >> FUNC:",servants_lst[servant][func_name])
   local params = luarpc.unmarshalling(request_msg, servants_lst[servant]["interface"])
-  print("\t >> NAME :",func_name)
-  print(luarpc.print_tables(params))
+  -- print("\t >> NAME :",func_name) -- [print] here
+  print(luarpc.print_tables(params))  -- [print] here
   local result = table.pack(servants_lst[servant]["obj"][func_name](table.unpack(params)))
-  print("\t >> RESULT:")
+  -- print("\t >> RESULT:") -- [print] here
   -- print(table.unpack(result))
   return luarpc.marshalling(result)
 end

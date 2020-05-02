@@ -16,6 +16,8 @@ local clients_lst = {} -- Table/Dict for clients
 --    }
 -- }
 
+local MAX_POOL_SIZE = 3 -- Change number of how many clients a servant can handle simultaneously
+
 -------------------------------------------------------------------------------- Main Functions
 function luarpc.createServant(obj, interface_path, port)
   local server = socket.try(socket.bind("*", port))
@@ -24,6 +26,9 @@ function luarpc.createServant(obj, interface_path, port)
   servants_lst[server] = {}
   servants_lst[server]["obj"] = obj
   servants_lst[server]["interface"] = interface_path
+
+  -- [V2]
+  servants_lst[server]["pool_queue"] = {}
 end
 
 
@@ -44,16 +49,16 @@ function luarpc.createProxy(host, port, interface_path)
         end
         swagger_struct[struct.fields[i].name] = tmp_type
       end
-      local isValid, params = luarpc.validate_client(params,fname,fmethod.args,swagger_struct)
-      if not isValid then
-        return "[ERROR] Invalid request, check prints"
+      local isValid, params, reasons = luarpc.validate_client(params,fname,fmethod.args,swagger_struct)
+      if not isValid and #reasons > 0 then
+        return "[ERROR]: Invalid request. Reason: \n" .. reasons
       end
 
-      proxy_stub.conn = socket.connect(host, port)
-      proxy_stub.conn:setoption("tcp-nodelay", true)
-      proxy_stub.conn:settimeout(2)
-      proxy_stub.conn:setoption("keepalive", true)
-      proxy_stub.conn:setoption("reuseaddr", true)
+      -- proxy_stub.conn = socket.connect(host, port)
+      -- proxy_stub.conn:setoption("tcp-nodelay", true)
+      -- proxy_stub.conn:settimeout(2)
+      -- proxy_stub.conn:setoption("keepalive", true)
+      -- proxy_stub.conn:setoption("reuseaddr", true)
 
       local msg = luarpc.marshalling(params)
       msg = fname .. "\n" .. msg
@@ -64,21 +69,46 @@ function luarpc.createProxy(host, port, interface_path)
       repeat
         ack,err = self.conn:receive()
         if err then
-          print("[ERROR]", err)
-          break
+          if err == "closed" then
+            print("Connection was closed due to connection pool's size")
+            return "___ERRORPC: Connection pool's size was exceed, client was discarded"
+          else
+            print("[ERROR] Unexpected... cause:", err)
+            break
+          end
         end
         if ack ~= nil and ack ~= "-fim-" then
           table.insert(returns,ack)
           -- print("\n\t\tMESSAGE INFO [PROXY]:",ack,err,"\n")
         end
       until ack == "-fim-"
-      proxy_stub.conn:close()
+      -- proxy_stub.conn:close()
       local res = luarpc.unmarshalling(returns, interface_path)
       return table.unpack(res)
     end --end of function
   end -- end of for
---  proxy_stub.conn = socket.connect(host, port)
+  proxy_stub.conn = socket.connect(host, port)
+  proxy_stub.conn:setoption("tcp-nodelay", true)
+  -- proxy_stub.conn:settimeout(2)
+  proxy_stub.conn:setoption("keepalive", true)
+  proxy_stub.conn:setoption("reuseaddr", true)
   return proxy_stub
+end
+
+
+function luarpc.update_pool_queue(servant, client)
+  table.insert(servants_lst[servant]["pool_queue"], client)
+  local pool_size = #servants_lst[servant]["pool_queue"]
+  if pool_size > MAX_POOL_SIZE then
+    print("CONNECTION EXCEED!! CLOSING CLIENTS: ", client)
+    local diff = pool_size - MAX_POOL_SIZE
+    for i=1,diff do
+      local oldest_client = table.remove(servants_lst[servant]["pool_queue"], 1) -- pop index 1
+      oldest_client:close()
+      print(string.format("\t >>> Client %s closed!", oldest_client))
+    end
+    print("\n")
+  end
 end
 
 
@@ -93,6 +123,7 @@ function luarpc.waitIncoming()
 --        print("\n\tSERVER SOCKET CASE\n")
         local servant = socket
         local client = assert(servant:accept())
+        -- print("\t\t >> NEW CLIENT:", client, "\n")
 --        print("\n\t\t\tCONNECTION ACCEPTED")
         client:settimeout(0.01)
         client:setoption("keepalive", true)
@@ -101,6 +132,7 @@ function luarpc.waitIncoming()
         clients_lst[client]["request"] = {}
         clients_lst[client]["servant"] = servant
         table.insert(sockets_lst, client)
+        luarpc.update_pool_queue(servant, client)
 
       else                                                    -- client
 --        print("\n\t\t\tCLIENT SOCKET CASE\n")
@@ -108,24 +140,29 @@ function luarpc.waitIncoming()
         local msg,err = client:receive()
 
         if err then
-          print("AN ERROR OCCURRED AT waitIncoming:client:receive",err)
+          if err == "closed" then
+            print("\t >>> Connection closed! Removing client... ", client)
+          else
+            print("AN ERROR OCCURRED AT waitIncoming:client:receive",err)
+          end
           luarpc.remove_socket(client,"c")
           break
         end
 
         if msg then
           if msg == "-fim-" then
-            print("\n\t\tALL MSG:",clients_lst[client]["request"], err, "\n")
-            luarpc.print_tables(clients_lst[client]["request"])
-            print("\n")
+            -- print(" End of message:",clients_lst[client]["request"], "\n")
+            -- luarpc.print_tables(clients_lst[client]["request"]) -- [print] here
+            -- print("\n")
             local result = luarpc.process_request(client)
-            -- luarpc.process_request(client)
-            print("\t\t >RES:",result)
-            -- client:send("OK\n")
+            print(string.format("Result of request, for client %s :",client))
+            print(result)
+            clients_lst[client]["request"] = {} -- clear message queue to prepare for next request
             client:send(result)
-            client:close()
-            luarpc.remove_socket(client,"c")
+            -- client:close()
+            -- luarpc.remove_socket(client,"c")
           else
+            -- print("\t\t >> PART MSG:",clients_lst[client]["request"], client, "\n")
             table.insert(clients_lst[client]["request"], msg)
           end
         end
@@ -138,15 +175,30 @@ end
 function luarpc.process_request(client)
   local request_msg = clients_lst[client]["request"]
   local func_name = table.remove(request_msg, 1) -- pop index 1
-  print("\t >> FNAME :",func_name)
+  print("\t >> FNAME :",func_name) -- [print] here
   -- print("\t >> SERVER:",clients_lst[client]["servant"])
   local servant = clients_lst[client]["servant"]
+
+
+
   -- print("\t >> FUNC:",servants_lst[servant][func_name])
   local params = luarpc.unmarshalling(request_msg, servants_lst[servant]["interface"])
-  print("\t >> NAME :",func_name)
-  print(luarpc.print_tables(params))
+  -- print("\t >> NAME :",func_name) -- [print] here
+  print(luarpc.print_tables(params))  -- [print] here
+
+
+  if servant == nil then
+    print("\t >>>> PROBLEM HERE servant")
+  elseif servants_lst[servant] == nil then
+    print("\t >>>> PROBLEM HERE servants_lst[servant]")
+  elseif servants_lst[servant]["obj"] == nil then
+    print("\t >>>> PROBLEM HERE servants_lst[servant][obj]")
+  elseif servants_lst[servant]["obj"][func_name] == nil then
+    print("\t >>>> PROBLEM HERE servants_lst[servant][obj][func_name]", func_name)
+  end -- TODO delete
+
   local result = table.pack(servants_lst[servant]["obj"][func_name](table.unpack(params)))
-  print("\t >> RESULT:")
+  -- print("\t >> RESULT:") -- [print] here
   -- print(table.unpack(result))
   return luarpc.marshalling(result)
 end
@@ -238,9 +290,11 @@ end
 -------------------------------------------------------------------------------- Auxiliary Functions
 function luarpc.remove_socket(sckt, case)
   local status = false
+  local client_server = nil
   if case == "c" then -- client
     for i,_ in pairs(clients_lst) do
       if i == sckt then
+        client_server = clients_lst[i]["servant"]
         clients_lst[i] = nil -- deleting key from table
         status = true
         break
@@ -260,6 +314,16 @@ function luarpc.remove_socket(sckt, case)
       if sockets_lst[i] == sckt then
         table.remove(sockets_lst,i)
         break
+      end
+    end
+
+    -- [V2]
+    if case == 'c' and client_server ~= nil then
+      for i=#servants_lst[client_server]["pool_queue"],1,-1 do -- iterating backwards to avoid errors
+        if servants_lst[client_server]["pool_queue"][i] == sckt then
+          table.remove(servants_lst[client_server]["pool_queue"],i)
+          break
+        end
       end
     end
   else
@@ -298,6 +362,7 @@ end
 function luarpc.validate_client(params,fname,iface_args,swagger_struct)
   local valid = true
   local inputs = {}
+  local reasons = ""
   for i=1,#iface_args do
     local arg_direc = iface_args[i].direction
     if arg_direc == "in" or arg_direc == "inout" then
@@ -307,8 +372,9 @@ function luarpc.validate_client(params,fname,iface_args,swagger_struct)
   end
   if not (#params == #inputs) then
     local reason = string.format("Method '%s' should receive %i args, but only receive %i",fname,#inputs,#params)
-    print("[ERROR] Invalid request! " .. reason)
+    -- -- print("[ERROR] Invalid request! " .. reason)
     valid = false
+    reasons = reasons .. "___ERRORPC: " .. reason .. "\n"
   else
     for i=1,#inputs do
       if inputs[i] == "int" or inputs[i] == "double" then -- number case
@@ -317,9 +383,10 @@ function luarpc.validate_client(params,fname,iface_args,swagger_struct)
           local tmp = tonumber(params[i])
           if tmp == nil then
             local reason = string.format("#%i arg of method '%s' must be a valid number format and not %s",i,fname,type(params[i]))
-            print("[ERROR] Invalid request! " .. reason)
+            -- print("[ERROR] Invalid request! " .. reason)
             valid = false
             inner_valid = false
+            reasons = reasons .. "___ERRORPC: " .. reason .. "\n"
           else
             params[i] = tmp
           end
@@ -334,8 +401,9 @@ function luarpc.validate_client(params,fname,iface_args,swagger_struct)
       elseif inputs[i] == "string" then -- string case
         if type(params[i]) ~= "string" and type(params[i]) ~= "number" then
           local reason = string.format("#%i arg of method '%s' must be a valid string, can't convert %s to string...",i,fname,type(params[i]))
-          print("[ERROR] Invalid request! " .. reason)
+          -- print("[ERROR] Invalid request! " .. reason)
           valid = false
+          reasons = reasons .. "___ERRORPC: " .. reason .. "\n"
         else
           params[i] = tostring(params[i])
         end
@@ -346,33 +414,46 @@ function luarpc.validate_client(params,fname,iface_args,swagger_struct)
         else
           for k,_ in pairs(params[i]) do
             if k ~= "nome" and k ~= "peso" and k ~= "idade" then
-              reason = reason .. string.format("\n  #%i arg of method '%s' contains invalid keys! minhaStruct table does not support '%s' key",i,fname,k)
+              reason = reason .. string.format("\n\t  #%i arg of method '%s' contains invalid keys! minhaStruct table does not support '%s' key",i,fname,k)
             end
           end
+
           if type(params[i].nome) ~= swagger_struct.nome then
-            reason = reason .. string.format("\n  #%i arg of method '%s' must be a table with 'name' of type string and not %s",i,fname,type(params[i].nome))
+            reason = reason .. string.format("\n\t  #%i arg of method '%s' must be a table with 'nome' of type string and not %s",i,fname,type(params[i].nome))
           end
-          params[i].peso = tonumber(params[i].peso)
-          if math.type(params[i].peso) ~= swagger_struct.peso then
-            reason = reason .. string.format("\n  #%i arg of method '%s' must be a table with 'peso' of type double and not %s",i,fname,type(params[i].peso))
+
+          if tonumber(params[i].peso) == nil then
+            reason = reason .. string.format("\n\t  #%i arg of method '%s' must be a table with 'peso' of type double. Can't convert '%s' to number",i,fname,params[i].peso)
+          else
+            params[i].peso = tonumber(params[i].peso)
+            if math.type(params[i].peso) ~= swagger_struct.peso then
+              reason = reason .. string.format("\n\t  #%i arg of method '%s' must be a table with 'peso' of type double and not %s",i,fname,type(params[i].peso))
+            end
           end
-          params[i].idade = tonumber(params[i].idade)
-          if math.type(params[i].idade) ~= swagger_struct.idade then
-            reason = reason .. string.format("\n  #%i arg of method '%s' must be a table with 'idade' of type int and not %s",i,fname,type(params[i].idade))
+
+          if tonumber(params[i].idade) == nil then
+            reason = reason .. string.format("\n\t  #%i arg of method '%s' must be a table with 'idade' of type int. Can't convert '%s' to number",i,fname,params[i].idade)
+          else
+            params[i].idade = tonumber(params[i].idade)
+            if math.type(params[i].idade) ~= swagger_struct.idade then
+              reason = reason .. string.format("\n\t  #%i arg of method '%s' must be a table with 'idade' of type int and not %s",i,fname,type(params[i].idade))
+            end
           end
         end
         if #reason > 0 then
-          print("[ERROR] Invalid request! " .. reason)
+          -- print("[ERROR] Invalid request! " .. reason)
           valid = false
+          reasons = reasons .. "___ERRORPC: " .. reason .. "\n"
         end
       else -- invalid
         local reason = string.format("#%i arg of method '%s' has type %s not supported",i,fname,type(params[i]))
-        print("[ERROR] Invalid request! " .. reason)
+        -- print("[ERROR] Invalid request! " .. reason)
         valid = false
+        reasons = reasons .. "___ERRORPC: " .. reason .. "\n"
       end
     end
   end
-  return valid, params
+  return valid, params, reasons
 end
 
 -------------------------------------------------------------------------------- Return RPC
