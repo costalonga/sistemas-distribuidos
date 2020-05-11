@@ -49,11 +49,7 @@ function luarpc.createProxy(host, port, interface_path)
         return "[ERROR] Invalid request, check prints"
       end
 
-      proxy_stub.conn = socket.connect(host, port)
-      proxy_stub.conn:setoption("tcp-nodelay", true)
-      proxy_stub.conn:settimeout(2)
-      proxy_stub.conn:setoption("keepalive", true)
-      proxy_stub.conn:setoption("reuseaddr", true)
+      proxy_stub.conn = luarpc.create_client_stub_conn(host, port)
 
       local msg = luarpc.marshalling(params)
       msg = fname .. "\n" .. msg
@@ -64,7 +60,7 @@ function luarpc.createProxy(host, port, interface_path)
       repeat
         ack,err = self.conn:receive()
         if err then
-          print("[ERROR]", err)
+          print("[ERROR] Unexpected... cause:", err)
           break
         end
         if ack ~= nil and ack ~= "-fim-" then
@@ -94,41 +90,16 @@ function luarpc.waitIncoming()
         local servant = socket
         local client = assert(servant:accept())
 --        print("\n\t\t\tCONNECTION ACCEPTED")
-        client:settimeout(0.01)
+        -- client:settimeout(0.01)
         client:setoption("keepalive", true)
-
         clients_lst[client] = {}
         clients_lst[client]["request"] = {}
         clients_lst[client]["servant"] = servant
         table.insert(sockets_lst, client)
-
+        luarpc.deal_with_request(client)
       else                                                    -- client
---        print("\n\t\t\tCLIENT SOCKET CASE\n")
         local client = socket
-        local msg,err = client:receive()
-
-        if err then
-          print("AN ERROR OCCURRED AT waitIncoming:client:receive",err)
-          luarpc.remove_socket(client,"c")
-          break
-        end
-
-        if msg then
-          if msg == "-fim-" then
-            print("\n\t\tALL MSG:",clients_lst[client]["request"], err, "\n")
-            luarpc.print_tables(clients_lst[client]["request"])
-            print("\n")
-            local result = luarpc.process_request(client)
-            -- luarpc.process_request(client)
-            print("\t\t >RES:",result)
-            -- client:send("OK\n")
-            client:send(result)
-            client:close()
-            luarpc.remove_socket(client,"c")
-          else
-            table.insert(clients_lst[client]["request"], msg)
-          end
-        end
+        luarpc.deal_with_request(client) -- does socket:receive() and send results to client
       end
     end
   end
@@ -236,6 +207,47 @@ function luarpc.marshalling(request_params_table)
 end
 
 -------------------------------------------------------------------------------- Auxiliary Functions
+function luarpc.deal_with_request(client)
+  local msg,err
+  repeat
+    msg,err = client:receive()
+    if err then
+      if err == "closed" then
+        print("\t >>> Connection closed! Removing client... ", client)
+      else
+        print("[ERROR] Unexpected error occurred at waitIncoming... cause:", err)
+      end
+      luarpc.remove_socket(client,"c")
+      break
+    end
+
+    if msg then
+      if msg == "-fim-" then
+        -- print(" End of message:",clients_lst[client]["request"], "\n")
+        -- luarpc.print_tables(clients_lst[client]["request"]) -- [print] here
+        -- print("\n")
+        local result = luarpc.process_request(client)
+        print(string.format("Result of request, for client %s :",client))
+        print(result)
+        clients_lst[client]["request"] = {} -- clear message queue to prepare for next request
+        client:send(result)
+        client:close()
+      else
+        table.insert(clients_lst[client]["request"], msg)
+      end
+    end
+  until msg == "-fim-"
+end
+
+function luarpc.create_client_stub_conn(host, port)
+  local conn = socket.connect(host, port)
+  conn:setoption("tcp-nodelay", true)
+  -- conn:settimeout(2)
+  conn:setoption("keepalive", true)
+  conn:setoption("reuseaddr", true)
+  return conn
+end
+
 function luarpc.remove_socket(sckt, case)
   local status = false
   if case == "c" then -- client

@@ -56,21 +56,6 @@ function luarpc.createProxy(host, port, interface_path)
       end
 
       if proxy_stub.conn == nil then -- creates a connection if its the first request from this client
-        -- TODO: delete and treat this possible errror (in case connection is "closed" is not nil but need to reconnect...)
-              -- SOLUTION: done by checking if connection is nil and by sending request more than once
-
-        -- TODO: make sure requests finished before connection to a new client ---> save client's "STATUS"
-              -- SOLUTION: saved by the accept -> receive AND the until & repeat
-
-        -- TODO: Assert that a connection that wasnt discarted will mainting openned
-              -- SOLUTION: garanteed by sending request more than once just to check if
-
-        -- TODO: Create functions to improve code...
-              -- in createProxy -> to send/receive msg
-              -- in waitIncoming -> to receive msgs
-              -- SOLUTION: made for create_clients_conn
-
-        -- TODO: tests...
         proxy_stub.conn = luarpc.create_client_stub_conn(host, port)
       end
 
@@ -159,6 +144,7 @@ function luarpc.waitIncoming()
         clients_lst[client]["servant"] = servant
         table.insert(sockets_lst, client)
         luarpc.update_pool_queue(servant, client)
+        luarpc.deal_with_request(client)
 
       else                                                    -- client
        -- print("\n\t\t\tCLIENT SOCKET CASE 2\n")
@@ -177,16 +163,6 @@ function luarpc.process_request(client)
   local servant = clients_lst[client]["servant"]
   local params = luarpc.unmarshalling(request_msg, servants_lst[servant]["interface"])
   print(luarpc.print_tables(params))  -- [print] here
-
-  -- if servant == nil then
-  --   print("\t >>>> PROBLEM HERE servant")
-  -- elseif servants_lst[servant] == nil then
-  --   print("\t >>>> PROBLEM HERE servants_lst[servant]")
-  -- elseif servants_lst[servant]["obj"] == nil then
-  --   print("\t >>>> PROBLEM HERE servants_lst[servant][obj]")
-  -- elseif servants_lst[servant]["obj"][func_name] == nil then
-  --   print("\t >>>> PROBLEM HERE servants_lst[servant][obj][func_name]", func_name)
-  -- end -- TODO delete
 
   local result = table.pack(servants_lst[servant]["obj"][func_name](table.unpack(params)))
   return luarpc.marshalling(result)

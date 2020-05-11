@@ -26,7 +26,6 @@ local r, s = p1:foo(3, "alo", {nome = "ana", idade = 20, peso = 50.0}, 2)
 print("foo1",r, s)
 -- sckt.sleep(1)
 
--- -- local p2 = luarpc.createProxy(IP, porta1, arq_interface)
 local r, s = p2:foo(3, "alo", {nome = "marina", idade = 5, peso = 50.0}, 0)
 print("foo2",r, s)
 -- -- sckt.sleep(0.35)
