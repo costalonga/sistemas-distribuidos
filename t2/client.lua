@@ -22,18 +22,16 @@ local p2 = luarpc.createProxy(IP, porta1, arq_interface)
 local p3 = luarpc.createProxy(IP, porta1, arq_interface)
 
 -- local p1 = luarpc.createProxy(IP, porta1, arq_interface)
-local r, s = p1:foo(3, "alo", {nome = 70, idade = "vinte", peso = 50.0}, 2)
+local r, s = p1:foo(3, "alo", {nome = "ana", idade = 20, peso = 50.0}, 2)
 print("foo1",r, s)
 -- sckt.sleep(1)
 
 -- -- local p2 = luarpc.createProxy(IP, porta1, arq_interface)
--- local r, s = p2:foo(3, "alo", {nome = "marina", idade = 5, peso = 50.0}, 0)
--- print("foo2",r, s)
+local r, s = p2:foo(3, "alo", {nome = "marina", idade = 5, peso = 50.0}, 0)
+print("foo2",r, s)
 -- -- sckt.sleep(0.35)
 --
 -- -- local p3 = luarpc.createProxy(IP, porta1, arq_interface)
--- local r, s = p3:foo(3, "alo", {nome = "marcelo", idade = 20, peso = 50.0}, 7)
--- print("foo3",r, s)
 -- -- sckt.sleep(0.15)
 --
 -- local p4 = luarpc.createProxy(IP, porta1, arq_interface)
@@ -41,8 +39,17 @@ print("foo1",r, s)
 -- print("foo4",r, s)
 --
 --
--- local t = p1:boo(66)
--- print("boo1",t)
+local t = p1:boo(61)
+print("boo1",t)
+
+
+local r, s = p3:foo(3, "alo", {nome = "marcelo", idade = 20, peso = 50.0}, 7)
+print("foo3",r, s)
+
+
+local t = p2:boo(62)
+print("boo2",t)
+
 
 -- sckt.sleep(6) -- here
 sckt.sleep(2)

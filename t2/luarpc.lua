@@ -16,7 +16,7 @@ local clients_lst = {} -- Table/Dict for clients
 --    }
 -- }
 
-local MAX_POOL_SIZE = 3 -- Change number of how many clients a servant can handle simultaneously
+local MAX_POOL_SIZE = 1 -- Change number of how many clients a servant can handle simultaneously
 
 -------------------------------------------------------------------------------- Main Functions
 function luarpc.createServant(obj, interface_path, port)
@@ -35,6 +35,7 @@ end
 function luarpc.createProxy(host, port, interface_path)
   local proxy_stub = {}
   dofile(interface_path)
+  proxy_stub["conn"] = nil
   for fname, fmethod in pairs(interface.methods) do
     proxy_stub[fname] = function(self, ...)
       params = {...}
@@ -54,44 +55,71 @@ function luarpc.createProxy(host, port, interface_path)
         return "[ERROR]: Invalid request. Reason: \n" .. reasons
       end
 
-      -- proxy_stub.conn = socket.connect(host, port)
-      -- proxy_stub.conn:setoption("tcp-nodelay", true)
-      -- proxy_stub.conn:settimeout(2)
-      -- proxy_stub.conn:setoption("keepalive", true)
-      -- proxy_stub.conn:setoption("reuseaddr", true)
+      if proxy_stub.conn == nil then -- creates a connection if its the first request from this client
+        -- TODO: delete and treat this possible errror (in case connection is "closed" is not nil but need to reconnect...)
+              -- SOLUTION: done by checking if connection is nil and by sending request more than once
+
+        -- TODO: make sure requests finished before connection to a new client ---> save client's "STATUS"
+              -- SOLUTION: saved by the accept -> receive AND the until & repeat
+
+        -- TODO: Assert that a connection that wasnt discarted will mainting openned
+              -- SOLUTION: garanteed by sending request more than once just to check if
+
+        -- TODO: Create functions to improve code...
+              -- in createProxy -> to send/receive msg
+              -- in waitIncoming -> to receive msgs
+              -- SOLUTION: made for create_clients_conn
+
+        -- TODO: tests...
+        proxy_stub.conn = luarpc.create_client_stub_conn(host, port)
+      end
 
       local msg = luarpc.marshalling(params)
-      msg = fname .. "\n" .. msg
-      -- print("\n\t\tGONNA SEND [PROXY]: ",msg)
-      self.conn:send(msg)
+      msg = fname .. "\n" .. msg -- add method's name followed by parameteers (according to the protocol)
       local ack,err
       local returns = {}
+
+      proxy_stub.conn:send(msg)
+      ack,err = proxy_stub.conn:receive()
+      if err then
+        if err == "closed" then -- check if connection is still closed
+          repeat
+            proxy_stub.conn:close()
+            local info_log = " > Connection was closed due to connection pool's size."
+            info_log = info_log .. " Reconnecting and sending request."
+            print(info_log)
+            proxy_stub.conn = luarpc.create_client_stub_conn(host, port)
+            proxy_stub.conn:send(msg)
+            ack,err = proxy_stub.conn:receive()
+            if ack ~= nil and ack ~= "-fim-" then
+              table.insert(returns,ack)
+            else
+              print("ELSE",ack, err)
+            end
+          until err ~= "closed" and ack ~= nil
+        else
+          print("[ERROR] Unexpected... cause:", err)
+        end
+
+      elseif ack ~= nil and ack ~= "-fim-" then
+        table.insert(returns,ack)
+      end
+
       repeat
-        ack,err = self.conn:receive()
+        ack,err = proxy_stub.conn:receive()
         if err then
-          if err == "closed" then
-            print("Connection was closed due to connection pool's size")
-            return "___ERRORPC: Connection pool's size was exceed, client was discarded"
-          else
-            print("[ERROR] Unexpected... cause:", err)
-            break
-          end
+          print("[ERROR] Unexpected... cause:", err)
+          break
         end
         if ack ~= nil and ack ~= "-fim-" then
           table.insert(returns,ack)
           -- print("\n\t\tMESSAGE INFO [PROXY]:",ack,err,"\n")
         end
       until ack == "-fim-"
-      -- proxy_stub.conn:close()
       local res = luarpc.unmarshalling(returns, interface_path)
       return table.unpack(res)
     end --end of function
   end -- end of for
-  proxy_stub.conn = socket.connect(host, port)
-  proxy_stub.conn:setoption("tcp-nodelay", true)
-  -- proxy_stub.conn:settimeout(2)
-  proxy_stub.conn:setoption("keepalive", true)
-  proxy_stub.conn:setoption("reuseaddr", true)
   return proxy_stub
 end
 
@@ -100,7 +128,8 @@ function luarpc.update_pool_queue(servant, client)
   table.insert(servants_lst[servant]["pool_queue"], client)
   local pool_size = #servants_lst[servant]["pool_queue"]
   if pool_size > MAX_POOL_SIZE then
-    print("CONNECTION EXCEED!! CLOSING CLIENTS: ", client)
+    print("CONNECTION EXCEED!! CLOSING CLIENTS TO MAKE ROOM FOR CLIENT: ", client)
+    print("Pool size = ", pool_size)
     local diff = pool_size - MAX_POOL_SIZE
     for i=1,diff do
       local oldest_client = table.remove(servants_lst[servant]["pool_queue"], 1) -- pop index 1
@@ -120,14 +149,11 @@ function luarpc.waitIncoming()
     for _, socket in ipairs(recvt) do
 
       if luarpc.check_which_socket(socket, servants_lst) then -- servant
---        print("\n\tSERVER SOCKET CASE\n")
+--        print("\n\tSERVER SOCKET CASE 1\n")
         local servant = socket
         local client = assert(servant:accept())
-        -- print("\t\t >> NEW CLIENT:", client, "\n")
---        print("\n\t\t\tCONNECTION ACCEPTED")
-        client:settimeout(0.01)
+        -- client:settimeout(0.01)
         client:setoption("keepalive", true)
-
         clients_lst[client] = {}
         clients_lst[client]["request"] = {}
         clients_lst[client]["servant"] = servant
@@ -135,37 +161,9 @@ function luarpc.waitIncoming()
         luarpc.update_pool_queue(servant, client)
 
       else                                                    -- client
---        print("\n\t\t\tCLIENT SOCKET CASE\n")
+       -- print("\n\t\t\tCLIENT SOCKET CASE 2\n")
         local client = socket
-        local msg,err = client:receive()
-
-        if err then
-          if err == "closed" then
-            print("\t >>> Connection closed! Removing client... ", client)
-          else
-            print("AN ERROR OCCURRED AT waitIncoming:client:receive",err)
-          end
-          luarpc.remove_socket(client,"c")
-          break
-        end
-
-        if msg then
-          if msg == "-fim-" then
-            -- print(" End of message:",clients_lst[client]["request"], "\n")
-            -- luarpc.print_tables(clients_lst[client]["request"]) -- [print] here
-            -- print("\n")
-            local result = luarpc.process_request(client)
-            print(string.format("Result of request, for client %s :",client))
-            print(result)
-            clients_lst[client]["request"] = {} -- clear message queue to prepare for next request
-            client:send(result)
-            -- client:close()
-            -- luarpc.remove_socket(client,"c")
-          else
-            -- print("\t\t >> PART MSG:",clients_lst[client]["request"], client, "\n")
-            table.insert(clients_lst[client]["request"], msg)
-          end
-        end
+        luarpc.deal_with_request(client) -- does socket:receive() and send results to client
       end
     end
   end
@@ -176,35 +174,25 @@ function luarpc.process_request(client)
   local request_msg = clients_lst[client]["request"]
   local func_name = table.remove(request_msg, 1) -- pop index 1
   print("\t >> FNAME :",func_name) -- [print] here
-  -- print("\t >> SERVER:",clients_lst[client]["servant"])
   local servant = clients_lst[client]["servant"]
-
-
-
-  -- print("\t >> FUNC:",servants_lst[servant][func_name])
   local params = luarpc.unmarshalling(request_msg, servants_lst[servant]["interface"])
-  -- print("\t >> NAME :",func_name) -- [print] here
   print(luarpc.print_tables(params))  -- [print] here
 
-
-  if servant == nil then
-    print("\t >>>> PROBLEM HERE servant")
-  elseif servants_lst[servant] == nil then
-    print("\t >>>> PROBLEM HERE servants_lst[servant]")
-  elseif servants_lst[servant]["obj"] == nil then
-    print("\t >>>> PROBLEM HERE servants_lst[servant][obj]")
-  elseif servants_lst[servant]["obj"][func_name] == nil then
-    print("\t >>>> PROBLEM HERE servants_lst[servant][obj][func_name]", func_name)
-  end -- TODO delete
+  -- if servant == nil then
+  --   print("\t >>>> PROBLEM HERE servant")
+  -- elseif servants_lst[servant] == nil then
+  --   print("\t >>>> PROBLEM HERE servants_lst[servant]")
+  -- elseif servants_lst[servant]["obj"] == nil then
+  --   print("\t >>>> PROBLEM HERE servants_lst[servant][obj]")
+  -- elseif servants_lst[servant]["obj"][func_name] == nil then
+  --   print("\t >>>> PROBLEM HERE servants_lst[servant][obj][func_name]", func_name)
+  -- end -- TODO delete
 
   local result = table.pack(servants_lst[servant]["obj"][func_name](table.unpack(params)))
-  -- print("\t >> RESULT:") -- [print] here
-  -- print(table.unpack(result))
   return luarpc.marshalling(result)
 end
 
 function luarpc.unmarshalling(request_params, interface)
-  -- print("\n\t UNMARSHALLING :")
   local params = {}
   for _,param in pairs(request_params) do
     value = luarpc.convert_param(param, interface)
@@ -219,11 +207,9 @@ function luarpc.convert_param(param, interface)
   local tmp_type = type(param)
   if first_char == "'" then --        string
     value = param:sub(2,#param-1) -- exclui '{' e '}' do primeiro e ultimo char da string
-    -- print("\t\t >>STRING",value)
   elseif first_char == "{" then --    table
     local str_struct = param:sub(2,#param-1)
     value = luarpc.tostruct(str_struct, interface)
-    -- print("\t\t >>TABLE", value)
   else --                             number
     value = tonumber(param)
     if math.type(value) == "integer" then
@@ -231,7 +217,6 @@ function luarpc.convert_param(param, interface)
     else
       tmp_type = "double"
     end
-    -- print("\t\t >>NUMBER", value, tmp_type)
   end
   return value, tmp_type
 end
@@ -288,6 +273,46 @@ function luarpc.marshalling(request_params_table)
 end
 
 -------------------------------------------------------------------------------- Auxiliary Functions
+function luarpc.deal_with_request(client)
+  local msg,err
+  repeat
+    msg,err = client:receive()
+    if err then
+      if err == "closed" then
+        print("\t >>> Connection closed! Removing client... ", client)
+      else
+        print("[ERROR] Unexpected error occurred at waitIncoming... cause:", err)
+      end
+      luarpc.remove_socket(client,"c")
+      break
+    end
+
+    if msg then
+      if msg == "-fim-" then
+        -- print(" End of message:",clients_lst[client]["request"], "\n")
+        -- luarpc.print_tables(clients_lst[client]["request"]) -- [print] here
+        -- print("\n")
+        local result = luarpc.process_request(client)
+        print(string.format("Result of request, for client %s :",client))
+        print(result)
+        clients_lst[client]["request"] = {} -- clear message queue to prepare for next request
+        client:send(result)
+      else
+        table.insert(clients_lst[client]["request"], msg)
+      end
+    end
+  until msg == "-fim-"
+end
+
+function luarpc.create_client_stub_conn(host, port)
+  local conn = socket.connect(host, port)
+  conn:setoption("tcp-nodelay", true)
+  -- conn:settimeout(2)
+  conn:setoption("keepalive", true)
+  conn:setoption("reuseaddr", true)
+  return conn
+end
+
 function luarpc.remove_socket(sckt, case)
   local status = false
   local client_server = nil
