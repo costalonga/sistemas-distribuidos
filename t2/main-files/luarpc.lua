@@ -33,9 +33,6 @@ end
 
 
 function luarpc.createProxy(host, port, interface_path)
-
-  print("SIZE OF LST: ", #sockets_lst)
-
   local proxy_stub = {}
   dofile(interface_path)
   proxy_stub["conn"] = nil
