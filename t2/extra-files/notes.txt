@@ -1,0 +1,102 @@
+p = {}
+for k,v in pairs(interface.methods) do
+  p[k] = function(self, ...)
+    local params = {...}
+    args = interface["methods"][k]["args"]
+    for i,j in pairs(args)
+
+
+end
+
+
+
+function luarpc.createProxy(host, port, interface_path)
+  local proxy_stub = {}
+  dofile(interface_path)
+--  TODO: Validate: obj
+  for fname, fmethod in pairs(interface.methods) do
+    proxy_stub[fname] = function(...)
+      local params = {}
+      local status, params =
+    end --end of function
+
+    proxy_stub.conn = socket.connect(ip, port)
+    return proxy_stub
+end
+
+
+TAB3 -> luarpc.sockets = {}
+TAB2 -> servant_list
+
+---------------------------------------------------------------
+PROTOCOL: [linha 217]
+  --marshall
+  local msg = M.marshall_call(k, params)..'\n'
+  -- send
+  self.conn:send(msg)
+
+---------------------------------------------------------------
+### WaitForIncomming usa 'loadstring()' or 'load()'
+
+    f = loadstring("i = i + 1")
+     is roughly equivalent to:
+    f = function () i = i + 1 end
+
+---------------------------------------------------------------
+Others interface:
+   --interface = {
+   --	name = "fooboo",
+   --	methods = {
+   --		foo = {
+   --			resulttype = "double",
+   --			args = {
+   --				{ direction = "in",  type = "double"},
+   --				{ direction = "in",  type = "double"},
+   --				{ direction = "out", type = "string"},
+   --			}
+
+   --		},
+   --		boo = {
+   --			resulttype = "void",
+   --			args = {
+   --				{ direction = "inout", type = "double"},
+   --			}
+   --		}
+   --	}
+   --}
+
+
+-------------- FAILED TESTs WITHOUT REASON (at least yet) ----------------------
+
+[V1-N50-loop=50] -> SERVER LOG:
+
+   LuaSocket version: LuaSocket 3.0-rc1
+   Server is running on port: 8000
+   Server is running on port: 8001
+   Waiting for Incoming...
+   /home/Marcelo/Documents/puc-tmp/ZeroBraneStudio-1.80/bin/linux/x64/lua53: ./luarpc.lua:139: Too many open files
+   stack traceback:
+   	[C]: in function 'assert'
+   	./luarpc.lua:139: in function 'luarpc.waitIncoming'
+   	...-tmp/ZeroBraneStudio-1.80/projects-marcelo/t2/server.lua:29: in main chunk
+   	[C]: in ?
+   Program completed in 190.65 seconds (pid: 17360).
+
+-------------------------------------------------------------------------------------
+
+
+WHAT THE BEST!!! [SHOULD BE V2 / loop 2500 / no sleep on client-test / no sleep for retry] 
+(base) [Marcelo@Marcelo t2]$ bash run-tests.sh 1 5 8000 8001 /home/Marcelo/Documents/puc-tmp/ZeroBraneStudio-1.80/projects-marcelo/t2/interface.lua
+LuaSocket version: LuaSocket 3.0-rc1
+LuaSocket version: LuaSocket 3.0-rc1
+LuaSocket version: LuaSocket 3.0-rc1
+LuaSocket version: LuaSocket 3.0-rc1
+LuaSocket version: LuaSocket 3.0-rc1
+	Total time: 3.2870872020721
+	Total time: 3.2900011539459
+	Total time: 3.2908079624176
+	Total time: 3.2921099662781
+	Total time: 3.2925398349762
+
+	Number of lines in file: 5 test-V1-N5-time-results.txt (number of times test was repeated)
+	Mediana: Total time: 3.2908079624176s
