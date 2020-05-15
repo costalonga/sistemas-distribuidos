@@ -60,7 +60,7 @@ end
 function luarpc.createServant(obj, interface_path, port)
   local server = socket.try(socket.bind("*", port))
   print("Server is running on port: " .. port)
-  table.insert(sockets_lst, server) -- insert at socket_lst
+  table.insert(sockets_lst, server) -- insert at sockets_lst
   servants_lst[server] = {}
   servants_lst[server]["obj"] = obj
   servants_lst[server]["interface"] = interface_path
@@ -86,34 +86,23 @@ function luarpc.createProxy_for_client(host, port, interface_path)
 
     proxy_stub[fname] = function(self, ...)
       params = {...}
+			valida_params(params)
 
-      local isValid, params = validator.validate_client(params,fname,fmethod.args)
-      if not isValid then
-        return "[ERROR] Invalid request, check prints"
-      end
-
+			-- abre nova conexao e envia request
       proxy_stub.conn = luarpc.create_client_stub_conn(host, port)
       local msg = marshall.create_protocol_msg(fname, params)
-      -- print("\n\t\tGONNA SEND [PROXY]: ",msg)
       proxy_stub.conn:send(msg)
-      print("\n >>> MESSAGE SENT! \n")
-      local ack,err
+
+			-- espera pela resposta do request
       local returns = {}
       repeat
-        print("\n >>> WAITING TO RECEIVE! \n")
-        ack,err = proxy_stub.conn:receive()
-        if err then
-          print("[ERROR] Unexpected... cause:", err)
-          break
-        end
-        if ack ~= nil and ack ~= "-fim-" then
-          table.insert(returns,ack)
-          -- print("\n\t\tMESSAGE INFO [PROXY]:",ack,err,"\n")
-        end
+        local ack,err = proxy_stub.conn:receive()
+        table.insert(returns,ack)
       until ack == "-fim-"
-      proxy_stub.conn:close()
-      local res = marshall.unmarshalling(returns, interface_path)
-      return table.unpack(res)
+
+      proxy_stub.conn:close() -- fecha conexao
+      local res = marshall.unmarshalling(returns, interface_path) -- converte string para table com results
+      return table.unpack(res) -- retorna results
     end --end of function
   end -- end of for
   return proxy_stub
@@ -122,57 +111,47 @@ end
 function luarpc.createProxy_for_server(host, port, interface_path)
   local proxy_stub = {}
   dofile(interface_path)
-  print("\t     >>> CREATEPROX 1 START:",host, port, interface_path)
   for fname, fmethod in pairs(interface.methods) do
     proxy_stub[fname] = function(self, ...)
       params = {...}
 
-      -- validation(params) XXX
-      proxy_stub.conn = luarpc.create_client_stub_conn(host, port)
+      -- valida_params(params) [TODO]
 
-      -- [TODO:T3]
-      local curr_co = coroutine.running()
-      print("\tCO RUNNING:", curr_co, "\n")
+			-- abre nova conexao e envia request
+			proxy_stub.conn = luarpc.create_client_stub_conn(host, port)
+
+      local curr_co = coroutine.running() -- pega running coroutine
       coroutines_by_socket[proxy_stub.conn] = curr_co -- registra na tabela
-      table.insert(sockets_lst, proxy_stub.conn) -- insert at socket_lst
+      table.insert(sockets_lst, proxy_stub.conn) -- insere na tabela global
 
       local msg = marshall.create_protocol_msg(fname, params)
       proxy_stub.conn:send(msg) -- envia peiddo RPC
 
-      local r1, r2 = coroutine.yield() -- CREATE PROXY
-      print("\t >> r1 , r2:", r1, r2, "\n")
+      local r1, r2 = coroutine.yield() -- faz yield
       coroutines_by_socket[proxy_stub.conn] = nil -- desregistra da tabela
-      proxy_stub.conn:close()
+			-- sockets_lst[proxy_stub.conn] = nil
 
       -- TODO HOW TO GET THE RETURN VALUE BACK ?????
 
-      -- local ack,err
-      -- local returns = {}
-      repeat
-	      print("\n >>> WAITING TO RECEIVE!",proxy_stub.conn," \n")
-        ack,err = self.conn:receive()
-        if err then
-          print("[ERROR] Unexpected... cause:", err)
-          break
-        end
-        if ack ~= nil and ack ~= "-fim-" then
-          table.insert(returns,ack)
-          -- print("\n\t\tMESSAGE INFO [PROXY]:",ack,err,"\n")
-        end
-      until ack == "-fim-"
+			-- espera pela resposta do request
+			local returns = {}
+			repeat
+				-- RECEIVE NAO PARECE FUNCIONAR
+				-- TODO: Verificar se ha algum retorno usando um timeout(0)
+				local ack,err = proxy_stub.conn:receive()
+				table.insert(returns,ack)
+			until ack == "-fim-"
 
-      proxy_stub.conn:close()
-      coroutines_by_socket[proxy_stub.conn] = nil -- desregistra da tabela
+			proxy_stub.conn:close() -- fecha conexao
 
-      local res = marshall.unmarshalling(returns, interface_path)
-      print("\t     >>> CREATEPROX 2- RETURND:",table.unpack(res))
-      return table.unpack(res)
+			-- NAO CHEGA NESSE RETURN
+			local res = marshall.unmarshalling(returns, interface_path) -- converte string para table com results
+			return table.unpack(res) -- retorna results
 
-      return 100
+			-- return 100
 
     end --end of function
   end -- end of for
-  print("\t     >>> CREATEPROX 2 END:")
   return proxy_stub
 end
 
@@ -189,7 +168,7 @@ function luarpc.waitIncoming()
 
         -- Cria nova conexao
         local client = assert(servant:accept())
-        add_new_client(client, servant) -- TODO use tcp-no-delay
+        add_new_client(client, servant)
         -- table.insert(sockets_lst, client)
 
         -- [TODO:T3]
@@ -201,46 +180,32 @@ function luarpc.waitIncoming()
             repeat
               msg,err = client:receive()
               if err then
-                print("[ERROR] Unexpected error occurred at waitIncoming... cause:", err)
                 break
               elseif msg then
                 if msg == "-fim-" then
                   local result = luarpc.process_request(client)
                   clients_lst[client]["request"] = {} -- clear message queue to prepare for next request
-                  print("\n\t >>> 'SELECT:CREATE_CO SENDING RESULT",client,result,"\n")
-                  client:send(result)
-                  client:close()
+                  client:send(result) -- envia resultado para outra ponta do socket
+                  client:close() -- fecha conexao
+									-- remove from table ?
                 else
                   table.insert(clients_lst[client]["request"], msg)
                 end
               end
             until msg == "-fim-"
-
           end)
 
-        print("\n\t >>> '[SVR] CO RESUME 1'- START",co,sckt,"\n")
-
         coroutine.resume(co, client) -- invoca a corotina
-        -- deal_with_request(client)
-
-        print("\n\t >>> '[SVR] CO RESUME 2'- STOP",co,sckt,"\n")
 
       else                                                    -- client
-        -- [TODO:T3]
-        -- aqui deve ser quando há chamada de rpc dentro da função definida pelo server... "será o de resposta a alguma chamada"
         -- para cada cliente ativo... aplicar reumse() em corrotina indicada pela tabela global
-
         local co = coroutines_by_socket[sckt]
 
         if co ~= nil then
-          print("\n\t >>> '[CLT] CO RESUME 1'- START",co,sckt,"\n")
           coroutine.resume(co)
-          print("\n\t >>> '[CLT] CO RESUME 2'- STOP",co,sckt,"\n")
         -- else
           -- TODO NEED TO REMOVE sckt from select list in this case
         end
-
-        -- local client = sckt
 
       end -- end if
     end -- end for
@@ -250,23 +215,13 @@ end
 
 -------------------------------------------------------------------------------- MARSHALLING/UNMARSHALLING
 function luarpc.process_request(client)
-
-
-
   local request_msg = clients_lst[client]["request"]
   local func_name = table.remove(request_msg, 1) -- pop index 1
   local servant = clients_lst[client]["servant"]
   local params = marshall.unmarshalling(request_msg, servants_lst[servant]["interface"])
 
-  -- print("\t >> FNAME :",func_name)
-  -- print("\t >> SERVER:",clients_lst[client]["servant"])
-  -- print("\t >> FUNC:",servants_lst[servant]["obj"][func_name])
-  -- print(luarpc.print_tables(params))
-
   -- invoke the method passed in the request with all it's parameters and get the result
   local result = table.pack(servants_lst[servant]["obj"][func_name](table.unpack(params)))
-
-  print("\n >>> PROCESSING REQUEST 2, res =", result[1], "\n")
 
   return marshall.marshalling(result)
 end

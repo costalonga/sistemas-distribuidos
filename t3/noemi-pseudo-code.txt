@@ -1,0 +1,21 @@
+no cliente:
+função retornada por createProxy:
+
+   - registra corotina corrente (retornada por coroutine.running) em tabela global indexada por socket aberto para a conexão
+   - envia pedido de RPC
+   - yield
+   (ao voltar)
+   - desregistra corotina da tabela global
+
+
+no servidor:
+waitincoming:
+
+   - select
+     - para cada socket servidor ativo
+       accept - cria novo socket
+                cria nova corotina e invoca essa corotina para fazer receive
+     - para cada socket cliente ativo
+       (como sempre fechamos conexão ao terminar uma chamada, este caso
+        será o de resposta a alguma chamada)
+              - resume em corotina indicada na tabela global

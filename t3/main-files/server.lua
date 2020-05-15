@@ -5,25 +5,16 @@ local porta2 = 8001
 local IP = "127.0.0.1"
 local arq_interface = "interface.lua"
 
--- local myobj1 = {
---   f1 = function (a, s, st, n)
---     local r1 = a*2
---     local r2 = tring.len(s) + st.idade + n
---     local p = luarpc.createProxy(IP, porta2, arq_interface)
---     local r3 = p.boo(10)
---     return r1, r2, r3
---   end
--- }
+-- AppendEntries RPC
+-- RequestVote RPC
 
 local myobj1 = {
   dummy = function (n)
     local n2 = n*n
-    -- print("\t     >>> LAST PRINT!!", n2)
-    local p = luarpc.createProxy(IP, porta2, arq_interface) -- never enters but never leaves ??
-    -- print("\n\t     >>> BEFORE P.BOO()", p)
+    local p = luarpc.createProxy_for_server(IP, porta2, arq_interface) -- never enters but never leaves ??
     local r1 = p.boo(n2)
-    -- print("\n\t     >>> RETURN OF p.boo(n2) = ", r1, "\n")
-    return r1
+		-- valor nao esta sendo retornado aqui!
+		return r1
   end
 }
 
