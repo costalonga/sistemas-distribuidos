@@ -52,6 +52,11 @@ function MARSHALL.tostruct(str_struct, interface)
   return tab_struct
 end
 
+function MARSHALL.create_protocol_msg(fname, params)
+  local msg = fname .. "\n" .. MARSHALL.marshalling(params)
+  return msg
+end
+
 function MARSHALL.marshalling(request_params_table)
   -- local msg = func_name .. "\n"
   local msg = ""

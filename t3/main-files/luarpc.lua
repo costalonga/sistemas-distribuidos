@@ -93,18 +93,14 @@ function luarpc.createProxy_for_client(host, port, interface_path)
       end
 
       proxy_stub.conn = luarpc.create_client_stub_conn(host, port)
-
-      local msg = marshall.marshalling(params)
-      msg = fname .. "\n" .. msg
+      local msg = marshall.create_protocol_msg(fname, params)
       -- print("\n\t\tGONNA SEND [PROXY]: ",msg)
       proxy_stub.conn:send(msg)
       print("\n >>> MESSAGE SENT! \n")
-
       local ack,err
       local returns = {}
       repeat
         print("\n >>> WAITING TO RECEIVE! \n")
-
         ack,err = proxy_stub.conn:receive()
         if err then
           print("[ERROR] Unexpected... cause:", err)
@@ -120,14 +116,13 @@ function luarpc.createProxy_for_client(host, port, interface_path)
       return table.unpack(res)
     end --end of function
   end -- end of for
-  --  proxy_stub.conn = socket.connect(host, port)
   return proxy_stub
 end
 
 function luarpc.createProxy(host, port, interface_path)
   local proxy_stub = {}
   dofile(interface_path)
-  print("\t >>>>>>>>> STUCK AT CREATEPROX:",host, port, interface_path)
+  print("\t     >>> CREATEPROX 1 START:",host, port, interface_path)
   for fname, fmethod in pairs(interface.methods) do
     proxy_stub[fname] = function(self, ...)
       params = {...}
@@ -136,30 +131,25 @@ function luarpc.createProxy(host, port, interface_path)
       proxy_stub.conn = luarpc.create_client_stub_conn(host, port)
 
       -- [TODO:T3]
-      local curr_co = coroutine.running() -- should it be this one??
+      local curr_co = coroutine.running()
       print("\tCO RUNNING:", curr_co, "\n")
       coroutines_by_socket[proxy_stub.conn] = curr_co -- registra na tabela
       table.insert(sockets_lst, proxy_stub.conn) -- insert at socket_lst
 
-      -- marshalling(msg) XXX
-      local msg = fname.."\n10\n-fim-\n"
+      local msg = marshall.create_protocol_msg(fname, params)
       proxy_stub.conn:send(msg) -- envia peiddo RPC
 
       local r1, r2 = coroutine.yield() -- CREATE PROXY
       print("\t >> r1 , r2:", r1, r2, "\n")
+      coroutines_by_socket[proxy_stub.conn] = nil -- desregistra da tabela
+      proxy_stub.conn:close()
 
-      coroutines_by_socket[proxy_stub.conn] = nil -- remove na tabela
-      -- remove from socket list also
+      -- TODO HOW TO GET THE RETURN VALUE BACK ?????
 
-      -- desregistra da tabela
-      -- unpack
-      -- TODO
-
-
-      -- TODO: RETURN
       -- local ack,err
       -- local returns = {}
       -- repeat
+      print("\n >>> WAITING TO RECEIVE!",proxy_stub.conn," \n")
       --   ack,err = self.conn:receive()
       --   if err then
       --     print("[ERROR] Unexpected... cause:", err)
@@ -172,12 +162,17 @@ function luarpc.createProxy(host, port, interface_path)
       -- until ack == "-fim-"
       --
       -- proxy_stub.conn:close()
+      -- coroutines_by_socket[proxy_stub.conn] = nil -- desregistra da tabela
+      --
       -- local res = marshall.unmarshalling(returns, interface_path)
+      -- print("\t     >>> CREATEPROX 2- RETURND:",table.unpack(res))
       -- return table.unpack(res)
+
+      return 100
 
     end --end of function
   end -- end of for
-  print("\t >>>>>>>>> STUCK 2 CREATEPROX:")
+  print("\t     >>> CREATEPROX 2 END:")
   return proxy_stub
 end
 
@@ -215,11 +210,8 @@ function luarpc.waitIncoming()
               elseif msg then
                 if msg == "-fim-" then
                   local result = luarpc.process_request(client)
-
-                  -- TODO: TRY TO REMOVED THIS GLOBAL CLIENTs LIST
-                  -- it may be unecessary, a local table would cost less and do the same...
-                  -- problem is at 'process_request()', need to know server's socket associated with client, you can pass it in case of server's select but not in client's select
                   clients_lst[client]["request"] = {} -- clear message queue to prepare for next request
+                  print("\n\t >>> 'SELECT:CREATE_CO SENDING RESULT",client,result,"\n")
                   client:send(result)
                   client:close()
                 else
@@ -230,12 +222,12 @@ function luarpc.waitIncoming()
 
           end)
 
-        print("\n\t >>> 'CO RESUME 1'  \n")
+        print("\n\t >>> '[SVR] CO RESUME 1'- START",co,sckt,"\n")
 
         coroutine.resume(co, client) -- invoca a corotina
         -- deal_with_request(client)
 
-        print("\n\t >>> 'CO RESUME 2'  \n")
+        print("\n\t >>> '[SVR] CO RESUME 2'- STOP",co,sckt,"\n")
 
       else                                                    -- client
         -- [TODO:T3]
@@ -243,7 +235,14 @@ function luarpc.waitIncoming()
         -- para cada cliente ativo... aplicar reumse() em corrotina indicada pela tabela global
 
         local co = coroutines_by_socket[sckt]
-        coroutine.resume(co)
+
+        if co ~= nil then
+          print("\n\t >>> '[CLT] CO RESUME 1'- START",co,sckt,"\n")
+          coroutine.resume(co)
+          print("\n\t >>> '[CLT] CO RESUME 2'- STOP",co,sckt,"\n")
+        -- else
+          -- TODO NEED TO REMOVE sckt from select list in this case
+        end
 
         -- local client = sckt
 

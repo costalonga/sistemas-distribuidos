@@ -3,7 +3,7 @@ local luarpc = require("luarpc")
 local porta1 = 8000
 local porta2 = 8001
 local IP = "127.0.0.1"
-local arq_interface = "/home/Marcelo/Documents/puc-tmp/ZeroBraneStudio-1.80/projects-marcelo/t3/interface.lua"
+local arq_interface = "interface.lua"
 
 -- local myobj1 = {
 --   f1 = function (a, s, st, n)
@@ -18,13 +18,11 @@ local arq_interface = "/home/Marcelo/Documents/puc-tmp/ZeroBraneStudio-1.80/proj
 local myobj1 = {
   dummy = function (n)
     local n2 = n*n
-    print("\t >>>>>>>>> LAST PRINT!!")
-
+    -- print("\t     >>> LAST PRINT!!", n2)
     local p = luarpc.createProxy(IP, porta2, arq_interface) -- never enters but never leaves ??
-
-    print("\t >>>>>>>>> NEVER GETS HERE!!")
-
+    -- print("\n\t     >>> BEFORE P.BOO()", p)
     local r1 = p.boo(n2)
+    -- print("\n\t     >>> RETURN OF p.boo(n2) = ", r1, "\n")
     return r1
   end
 }
