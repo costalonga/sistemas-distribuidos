@@ -13,4 +13,5 @@
 - multiple servers communicating to each other
 - Objective: simulate an election alogorithm like RAFT 
 - TODOs:
-  - [ ] change t2 to let servers send and receive messages from each other and not just from clients
+  - [x] adapt code from t2 to let servers send and receive messages from each other and not just from clients
+  - [ ] fix coroutines communication, need to synchronize it
