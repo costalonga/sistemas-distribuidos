@@ -17,7 +17,7 @@ function MARSHALL.convert_param(param, interface)
     value = param:sub(2,#param-1) -- exclui '{' e '}' do primeiro e ultimo char da string
   elseif first_char == "{" then --    table
     local str_struct = param:sub(2,#param-1)
-    value = luarpc.tostruct(str_struct, interface)
+    value = MARSHALL.tostruct(str_struct, interface)
   else --                             number
     value = tonumber(param)
     if math.type(value) == "integer" then
@@ -39,7 +39,7 @@ function MARSHALL.tostruct(str_struct, interface)
     local str_key = expression:sub(1, equal_sign-1)
     local str_value = expression:sub(equal_sign+1, #expression)
 
-    local value, tmp_type = luarpc.convert_param(str_value, interface)
+    local value, tmp_type = MARSHALL.convert_param(str_value, interface)
     local field_name
     for i=1,#struct.fields do
       if struct.fields[i].name == str_key then
@@ -52,15 +52,15 @@ function MARSHALL.tostruct(str_struct, interface)
   return tab_struct
 end
 
-function MARSHALL.create_protocol_msg(fname, params)
-  local msg = fname .. "\n" .. MARSHALL.marshalling(params)
+function MARSHALL.create_protocol_msg(fname, params, index)
+  local msg = fname .. "\n" .. MARSHALL.marshalling(params, index)
   return msg
 end
 
-function MARSHALL.marshalling(request_params_table)
+function MARSHALL.marshalling(request_params_table, index)
   -- local msg = func_name .. "\n"
   local msg = ""
-  for i=1,#request_params_table do
+  for i=index,#request_params_table do
     if type(request_params_table[i]) == "table" then
       msg = msg .. "{"
       for k,v in pairs(request_params_table[i]) do
