@@ -90,7 +90,7 @@ function luarpc.createProxy(host, port, interface_path)
       if coroutine.isyieldable() then
 
         -- coroutine-client
-        msg = marshall.create_protocol_msg(fname, params,1)
+        msg = marshall.create_protocol_msg(fname, params)
 
         -- proxy_stub.conn = luarpc.create_client_stub_conn(host, port, false)
         proxy_stub.conn = luarpc.create_client_stub_conn(host, port, true)
@@ -108,7 +108,7 @@ function luarpc.createProxy(host, port, interface_path)
       else
 
         -- original-client
-        msg = marshall.create_protocol_msg(fname, params,2)
+        msg = marshall.create_protocol_msg(fname, params)
 
         print("\n\t     >>> [cli] createProxy CASE 2", "\n")
         proxy_stub.conn = luarpc.create_client_stub_conn(host, port, false)
@@ -228,7 +228,7 @@ function luarpc.process_request(client)
 
   -- invoke the method passed in the request with all it's parameters and get the result
   local result = table.pack(servants_lst[servant]["obj"][func_name](table.unpack(params)))
-  local msg_to_send = marshall.marshalling(result,1) -- TODO HIGH PRIORITY FIX THIS
+  local msg_to_send = marshall.marshalling(result)
   print("\n\n\t\t >>>>>> [SVR -> CLT] MSG TO BE SENT 3:",msg_to_send)
   return msg_to_send
   -- return marshall.marshalling(result)
