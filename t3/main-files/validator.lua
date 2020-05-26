@@ -27,7 +27,7 @@ function VALIDATOR.validate_client(params,fname,iface_args)
     end
   end
   if not (#params == #inputs) then
-    local reason = string.format("Method '%s' should receive %i args, but only receive %i",fname,#inputs,#params)
+    local reason = string.format("Method '%s' should receive %i args, but received %i instead",fname,#inputs,#params)
     -- -- print("[ERROR] Invalid request! " .. reason)
     valid = false
     reasons = reasons .. "___ERRORPC: " .. reason .. "\n"

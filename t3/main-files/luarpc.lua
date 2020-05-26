@@ -40,7 +40,12 @@ function luarpc.createProxy(host, port, interface_path)
     proxy_stub[fname] = function(...)
       local params = {...}
 
-      -- valida_params(params) [TODO]
+      -- assert parameters doesn't have errors
+      local isValid, params, reasons = validator.validate_client(params,fname,fmethod.args)
+      if not isValid and #reasons > 0 then
+        return "[ERROR]: Invalid request. Reason: \n" .. reasons
+      end
+
       local msg = marshall.create_protocol_msg(fname, params)
 
       -- abre nova conexao e envia request

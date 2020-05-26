@@ -1,13 +1,11 @@
 local luarpc = require("luarpc")
 local sckt = require("socket")
 
-local porta1 = tonumber(arg[1])
-local porta2 = tonumber(arg[2])
-local arq_interface = arg[3]
+local porta1 = 8000
+local porta2 = 8001
+local arq_interface = arg[1]
+local test = tonumber(arg[2])
 
-local test = tonumber(arg[4])
-
-local REQUEST_NUM = 2500
 local IP = "127.0.0.1"
 
 
@@ -26,7 +24,7 @@ elseif test == 1 then -- server calls itself
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 2 servers
 elseif test == 2 then -- server 8000 makes RPC call to port 8001
-  local r = p1.dummy(10)
+  local r = p1.dummy(10,10,10)
   print("\n RES p1.dummy(10) = ",r, "\n")
 
   local r, s = p1.complex_foo(3, "alo", {nome = "ana", idade = 20, peso = 57.0}, 2)
