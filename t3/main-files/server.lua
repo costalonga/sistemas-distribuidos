@@ -13,7 +13,6 @@ local myobj1 = {
     local n2 = n*n
     local p = luarpc.createProxy_for_server(IP, porta2, arq_interface) -- never enters but never leaves ??
     local r1 = p.boo(n2)
-		-- valor nao esta sendo retornado aqui!
 		return r1
   end
 }

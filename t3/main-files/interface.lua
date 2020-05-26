@@ -77,14 +77,25 @@ interface = {
      args = {
        {direction = "in", type = "string"},
      }
+   },
+   call_yourself = {
+     resulttype = "int",
+     args = {
+       {direction = "in", type = "int"},
+       {direction = "in", type = "int"},
+     }
+   },
+   simple_f1 = {
+     resulttype = "int",
+     args = {
+       {direction = "in", type = "int"},
+     }
+   },
+   simple_f2 = {
+     resulttype = "int",
+     args = {
+       {direction = "in", type = "int"},
+     }
    }
-   -- easy = {
-   --   resulttype = "string",
-   --   args = {
-   --     {direction = "in", type = "string"},
-   --     {direction = "in", type = "string"},
-   --     {direction = "in", type = "int"},
-   --   }
-   -- }
  }
 }
