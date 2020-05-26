@@ -15,6 +15,6 @@
 - TODOs:
   - [x] adapt code from t2 to let servers send and receive messages from each other and not just from clients
   - [x] fix coroutines communication, need to synchronize it
-  - [ ] return socket from yield() instead of adding to global table
-  - [ ] test server making RPC calls to itself 
-  - [ ] fix problem of passing parameters from initial client vs coroutine client, so it doesn't need to use more than one type o marshalling
+  - [x] test server making RPC calls to itself 
+  - [x] fix problem of passing parameters from initial client vs coroutine client, so it doesn't need to use more than one type o marshalling
+  - [x] removed client's global table, was unnecessary 
