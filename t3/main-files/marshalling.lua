@@ -16,7 +16,7 @@ function MARSHALL.convert_param(param, interface)
   if first_char == "'" then --        string
     value = param:sub(2,#param-1) -- exclui '{' e '}' do primeiro e ultimo char da string
   elseif first_char == "{" then --    table
-    local str_struct = param:sub(2,#param-1)
+    local str_struct = param:sub(2,#param-1) -- get new array without first char
     value = MARSHALL.tostruct(str_struct, interface)
   else --                             number
     value = tonumber(param)

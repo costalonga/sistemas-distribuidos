@@ -12,7 +12,6 @@ local luarpc = {}
 local servants_lst = {} -- Table/Dict with -> servers_sockets.obj and servers_sockets.interface
 local sockets_lst = {} -- Array with all sockets
 local coroutines_by_socket = {} -- < socket:coroutine >
-local co_awake_lst = {} -- < coroutine:time > (coroutines sorted by awake time) -- [CHANGED]
 -- local clients_lst = {} -- Not being used any more
 
 -------------------------------------------------------------------------------- Auxiliary Functions
@@ -97,41 +96,11 @@ function luarpc.createProxy(host, port, interface_path)
   return proxy_stub
 end
 
-
-local wait = function (seg)
-  if coroutine.isyieldable() then
-    local wait_time = socket.gettime() + seg
-    local curr_co = coroutine.running()
-    table.insert(co_awake_lst, 1, {co = curr_co, wait = wait_time}) -- insert at the beginning of the list
-    coroutine.yield()
-  else
-    print("ERROR: UNEXPECTED UNYIELDABLE COROUTINE")
-  end
-end
-
-
 function luarpc.waitIncoming()
 
   print("Waiting for Incoming...")
   while true do
-
-    local selects_timeout = 3 --TODO CHANGE: calcuate based on "first" (last) timeout from sorted array
-    local recvt, tmp, err = socket.select(sockets_lst, nil, selects_timeout)
-    print("\n\n\t SELECT's ERR = ", err, "\n")
-    if err == "timeout" then
-      local curr_time = socket.gettime()
-      for i = #co_awake_lst,1,-1 do
-        if co_awake_lst[i].wait <= curr_time then
-          local tmp_co = table.remove(a,i)
-          print("REMOVED AND RESUMING",tmp_co, tmp_co.co)
-          coroutine.resume(tmp_co)
-        else
-          print("NO MORE COROUTINES TO RESUME! STOPPED AT:",a[i], a[i].co, a[i].waitting)
-          break
-        end
-      end
-    end
-
+    local recvt, tmp, err = socket.select(sockets_lst)
     for _, sckt in ipairs(recvt) do
 
       if luarpc.check_which_socket(sckt, servants_lst) then -- servant
