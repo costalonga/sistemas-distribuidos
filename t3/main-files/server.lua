@@ -61,19 +61,19 @@ luarpc.waitIncoming()
   end
 
 
-a = {}
-table.insert(a,1,b)
-table.insert(a,1,c)
-table.insert(a,1,d)
-table.insert(a,1,e)
-
-
-for i = #a,1,-1 do
-  if a[i].waitting <= 17 then
-    local j = table.remove(a,i)
-    print("REMOVED",j, j.co, j.waitting)
-  else
-    print("OKAY",a[i], a[i].co, a[i].waitting)
-    break
-  end
-end
+-- a = {}
+-- table.insert(a,1,b)
+-- table.insert(a,1,c)
+-- table.insert(a,1,d)
+-- table.insert(a,1,e)
+--
+--
+-- for i = #a,1,-1 do
+--   if a[i].waitting <= 17 then
+--     local j = table.remove(a,i)
+--     print("REMOVED",j, j.co, j.waitting)
+--   else
+--     print("OKAY",a[i], a[i].co, a[i].waitting)
+--     break
+--   end
+-- end
