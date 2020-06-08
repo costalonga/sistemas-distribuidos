@@ -12,7 +12,7 @@ local luarpc = {}
 local servants_lst = {} -- Table/Dict with -> servers_sockets.obj and servers_sockets.interface
 local sockets_lst = {} -- Array with all sockets
 local coroutines_by_socket = {} -- < socket:coroutine >
-local co_awake_lst = {} -- < coroutine:time > (coroutines sorted by awake time) -- [CHANGED]
+local awaiting_coroutines = {} -- < coroutine:time > (coroutines sorted by awake time) -- [CHANGED]
 -- local clients_lst = {} -- Not being used any more
 
 -------------------------------------------------------------------------------- Auxiliary Functions
@@ -98,11 +98,11 @@ function luarpc.createProxy(host, port, interface_path)
 end
 
 
-local wait = function (seg)
+function luarpc.wait(seg)
   if coroutine.isyieldable() then
     local wait_time = socket.gettime() + seg
     local curr_co = coroutine.running()
-    table.insert(co_awake_lst, 1, {co = curr_co, wait = wait_time}) -- insert at the beginning of the list
+    table.insert(awaiting_coroutines, 1, {co = curr_co, wait = wait_time}) -- insert at the beginning of the list
     coroutine.yield()
   else
     print("ERROR: UNEXPECTED UNYIELDABLE COROUTINE")
@@ -115,15 +115,16 @@ function luarpc.waitIncoming()
   print("Waiting for Incoming...")
   while true do
 
-    local selects_timeout = 3 --TODO CHANGE: calcuate based on "first" (last) timeout from sorted array
-    local recvt, tmp, err = socket.select(sockets_lst, nil, selects_timeout)
+		local curr_time = socket.gettime()
+    local select_timeout = awaiting_coroutines[#awaiting_coroutines] - curr_time
+    local recvt, tmp, err = socket.select(sockets_lst, nil, select_timeout)
     print("\n\n\t SELECT's ERR = ", err, "\n")
     if err == "timeout" then
-      local curr_time = socket.gettime()
-      for i = #co_awake_lst,1,-1 do
-        if co_awake_lst[i].wait <= curr_time then
+      for i = #awaiting_coroutines,1,-1 do
+        if awaiting_coroutines[i].wait <= curr_time then
           local tmp_co = table.remove(a,i)
           print("REMOVED AND RESUMING",tmp_co, tmp_co.co)
+					-- TODO: Verificar se nao precisa fazer nada APOS o resume() (em todos o casos, chamada RPC, requestVotes, waitting...)
           coroutine.resume(tmp_co)
         else
           print("NO MORE COROUTINES TO RESUME! STOPPED AT:",a[i], a[i].co, a[i].waitting)
@@ -153,6 +154,11 @@ function luarpc.waitIncoming()
               msg,err = client:receive()
               -- print("\t >>> >>> '[SVR] RECEIVED'",msg,err) -- [DEBUG]
               if err then
+
+								-- TODO: VERIFICAR ERRO DE CONEXAO:
+								--				-- caso um servant caia, outro server não vai ficar esperando infinitamente uma resposta da 'request_votes' e etc
+								-- 				-- logo, deve chegar um erro de "closed" dentro da SELECT (por aqui I GUESS), e ele deve ser tratado -> esquecer essa conexao
+
                 print("[ERROR] Unexpected error occurred at waitIncoming... cause:", err)
                 break
               end

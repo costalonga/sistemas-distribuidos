@@ -11,14 +11,14 @@ local arq_interface = "interface.lua"
 -- RequestVote RPC
 
 local myobj = {
-  dummy = function (n)
-    local n2 = n*n
-    local p = luarpc.createProxy_for_server(IP, porta1, arq_interface) -- never enters but never leaves ??
-    local r1 = p.boo(n2)
-		return r1
-  end,
+  -- dummy = function (n)
+  --   local n2 = n*n
+  --   local p = luarpc.createProxy_for_server(IP, porta1, arq_interface) -- never enters but never leaves ??
+  --   local r1 = p.boo(n2)
+	-- 	return r1
+  -- end,
   execute = function (addresses)
-    print("TODO")
+    luarpc.wait()
   end,
   send_heartbeat() print("TODO - sending heartbeats...") end,
   request_votes() print("TODO - requesting votes...") end
