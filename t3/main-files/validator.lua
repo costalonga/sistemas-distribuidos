@@ -101,6 +101,11 @@ function VALIDATOR.validate_client(params,fname,iface_args)
           valid = false
           reasons = reasons .. "___ERRORPC: " .. reason .. "\n"
         end
+
+      elseif inputs[i] == "addresses" then -- table case 2
+        valid = true
+        -- TODO FIX IT
+
       else -- invalid
         local reason = string.format("#%i arg of method '%s' has type %s not supported",i,fname,type(params[i]))
         -- print("[ERROR] Invalid request! " .. reason)
