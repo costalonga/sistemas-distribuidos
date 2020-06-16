@@ -1,33 +1,47 @@
 local luarpc = require("luarpc")
+local replic = require("replic")
+local socket = require("socket")
 
 local porta0 = 8000
 local porta1 = 8001
 local porta2 = 8002
+local porta3 = 8003
+local porta4 = 8004
 
 local IP = "127.0.0.1"
 local arq_interface = "interface.lua"
-local my_port = porta0
 
 -- AppendEntries RPC
 -- RequestVote RPC
 
+local my_port = porta0
+local addresses = {{ip = IP, port = porta1}}
 
-local addresses = {
-  {ip = IP, port = porta1},
-  {ip = IP, port = porta2}
-  -- TODO: should have port0 also ???
-}
+-- local addresses = {
+--   {ip = IP, port = porta1},
+--   {ip = IP, port = porta2},
+--   {ip = IP, port = porta3},
+--   {ip = IP, port = porta4}
+--   -- TODO: should have port0 also ???
+-- }
 
+local my_replic = replic.newReplic(1 + my_port - 8000)
+my_replic.printReplic()
 
 local myobj = {
-  requestVotes = function (candidateTerm, candidateId, lastLogIndex, lastLogTerm)
+  requestVotes = function (candidateTerm, candidateId)
     print("TODO - requesting votes...")
+    local caID = candidateId
+    local caTerm = candidateTerm
+    local myID = my_replic.getID()
+    local myterm = my_replic.getTerm()
+    print(string.format("[SVR1] myID=%i caID=%i | myTerm=%i caTerm=%i",myID,caID,myterm,caTerm))
     local curr_term
     local vote_granted
     return curr_term, vote_granted
   end,
 
-  appendEntries = function (leaderTerm, leaderId, prevLogIndex, entries, leaderCommit)
+  appendEntries = function (leaderTerm, leaderId)
     print("TODO - sending heartbeats...")
     local curr_term
     local success
@@ -36,39 +50,47 @@ local myobj = {
 
   execute = function (addresses_lst) -- TODO: FIX, change back 'addresses_lst' -> 'addresses'
     local is_leader = true -- TODO: fix, this was used just for testing
-
-    local p = luarpc.createProxy(IP, my_port, arq_interface)
+    -- local my_replic = replic.newReplic(1 + my_port - 8000)
+    local my_proxy = luarpc.createProxy(IP, my_port, arq_interface)
     local proxies = {}
+
     for _,address in addresses do
       table.insert(proxies, luarpc.createProxy(address.ip, address.port, arq_interface))
     end
 
     while true do
-      local rand_time = math.random(1,4) -- TODO: must be smaller than heartbets time
-      print(string.format(" >>> [SERV] execute - before wait(%i) >>>",rand_time))
-      luarpc.wait(rand_time)
-      print(string.format(" <<< [SERV] execute - after wait(%i) <<<\n",rand_time))
+      local rand_wait_time = math.random(1,4) -- TODO: must be smaller than heartbets time
+      -- local heartbeat_timeout = math.random(7)
+      local heartbeat_timeout = 7
+      local last_heartbeat_occurance = socket.gettime() + 6
 
-      if is_learder then
-        p.appendEntries() -- send heartbeats
+      print(string.format(" >>> [SRV1] execute - before wait(%i) >>>",rand_wait_time))
+      luarpc.wait(rand_wait_time)
+      print(string.format(" <<< [SRV1] execute - after wait(%i) <<<\n",rand_wait_time))
 
-
-      else
-        is_leader = not is_leader -- TODO: fix, this was used just for testing
-        if heartbeat_timeout <= last_heartbeat_occurance then
-          for _,proxy in proxies do
-            local ack = proxy.requestVotes()
-            -- TODO: should request vote for itself also?
-            treat_ack(ack)
-            check_if_is_leader(ack)
-          end
-        end
-      end
+      -- if my_replic.isLeader() then
+      --   my_proxy.appendEntries() -- send heartbeats
+      --
+      -- else
+      --   -- se nao recebeu nenhum heartbeat até o tempo limite, inicia pedido de votos
+      --   if heartbeat_timeout + socket.gettime() <= last_heartbeat_occurance then
+      --     my_replic.resetVotesCount() -- reset vote count from last term
+      --     my_replic.setState("c") -- set to candidate
+      --     my_replic.incTerm() -- vote for itself
+      --     for _,proxy in proxies do
+      --       local vote_granted = proxy.requestVotes(my_replic.getTerm(), my_replic.getID())
+      --       if vote_granted then my_replic.incVotesCount() end
+      --       -- TODO: should request vote for itself also?
+      --       -- treat_ack(ack)
+      --       -- check_if_is_leader(ack)
+      --     end
+      --   end
+      -- end
     end
   end
 }
 
-luarpc.createServant(myobj, "interface.lua", porta0)
+luarpc.createServant(myobj, "interface.lua", my_port)
 luarpc.waitIncoming()
 
 
