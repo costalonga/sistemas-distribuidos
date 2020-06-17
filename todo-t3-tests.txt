@@ -1,0 +1,29 @@
+TESTES:
+	OBS1: se alguma replica foi derrubada -> considerar que ela morreu para sempre (MAYBE considerar esse caso depois)
+	OBS2: usar sempre 5 replicas
+
+	CASES:
+		0 - definir o 1o lider
+		1 - derrubar o lider ->
+					- ver se ele se recupera direito
+					- botar 2 timeouts iguais para obrigar a ter mesnagens em transito ao mesmo tempo
+		2 - para que qnd pedir votos, as respostas sejam mais lentas:
+					- botar um wait dentro da requestVotes() (tornar a eleição ser mais demorada) para garantir que iria ter mais de uma eleição simultaneamente
+
+
+NOTE: nao se preocupar com o LogEntries, ou LOGs em geral (lastLogIndex e etc...)
+
+
+	Dúvidas:
+	- No caso de duas eleições simultâneas: (isso já implica que candidatos estão em Terms diferentes, certo?)
+			- se ambos os candidatos estiverem no mesmo Term é fácil de lidar
+			- se cada candidato estiver em um Term diferente, então...
+					Ex:
+						ca2->Term3 começou votos
+						ca5->Term2 começou votos
+
+						r1 recebe request de ca5 (term 2)
+						mas logo depois recebe request de ca2 (term 3) que tem o rank maior... o que fazer ?
+								- votar em ambos ? (mas aí quando ca2 atualizar seu Term ele deveria invalidar os votos recebidos?)
+								- há possibilidades de uma replica follower estar num Term MENOR que o de CA5 (ou todas deveriam estar pelo menos no mesmo term de ca5??)
+								- caso CA5 atualizasse seu Term para 3 também, e no final ambos tivessem os mesmos votos, então seria um empate normal ??
