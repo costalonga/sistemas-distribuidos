@@ -7,23 +7,26 @@ local porta2 = 8002
 
 local arq_interface = arg[1]
 local test = tonumber(arg[2])
+local my_port = tonumber(arg[3])
 
 local IP = "127.0.0.1"
 
 
-local addresses_lst = {
+local addresses = {
   {ip = IP, port = porta1},
-  {ip = IP, port = porta2}
+  {ip = IP, port = porta2},
+  {ip = IP, port = porta3},
+  {ip = IP, port = porta4}
   -- TODO: should have port0 also ???
 }
 
-local p1 = luarpc.createProxy(IP, porta0, arq_interface)
+local p1 = luarpc.createProxy(IP, my_port, arq_interface)
 
 -- local p2 = luarpc.createProxy(IP, porta1, arq_interface)
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 1 server
 if test == 0 then -- server makes simple call like in our first RPC version
-  local r, s = p1.execute({ip = IP, port = porta0})
+  local r, s = p1.execute({ip = IP, port = my_port})
   print("\n RES p1.execute = ",r, s, "\n")
 
 elseif test == 1 then -- server calls itself
