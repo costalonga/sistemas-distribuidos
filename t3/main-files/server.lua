@@ -1,6 +1,7 @@
 local luarpc = require("luarpc")
 local replic = require("replic")
 local socket = require("socket")
+local state = require("states_enum")
 
 local porta0 = 8000
 local porta1 = 8001
@@ -16,8 +17,12 @@ local arq_interface = "interface.lua"
 
 local my_port = tonumber(arg[1])
 
-local addresses = {{ip = IP, port = porta0}}
+-- local addresses = {{ip = IP, port = porta1}}
 
+-- TODO: Temp for testing... delete
+local tmp_port
+if my_port == 8000 then tmp_port = 8001 else tmp_port = 8001 end
+local addresses = {{ip = IP, port = tmp_port}}
 
 -- local addresses = {
 --   {ip = IP, port = porta0},
@@ -37,10 +42,29 @@ local myobj = {
     local caID = candidateId
     local caTerm = candidateTerm
     local myID = my_replic.getID()
-    local myterm = my_replic.getTerm()
-    print(string.format("[SVR2] myID=%i caID=%i | myTerm=%i caTerm=%i",myID,caID,myterm,caTerm))
-    local curr_term
-    local vote_granted
+    local curr_term = my_replic.getTerm()
+    local vote_granted = false
+
+    print(string.format("[SRV%i] myID=%i caID=%i | myterm=%i caTerm=%i",myID,myID,caID,curr_term,caTerm))
+    print("HERE1")
+
+    -- cases where vote is granted
+    -- NOTE-BUG ? WHY This if clause doens't work without 'tonumber' ???
+    if tonumber(caTerm) > tonumber(curr_term) then -- candidate has a better rank
+      print("HERE2")
+      curr_term = caTerm -- TODO-V3-tests check if this assertion wont fail in case Ex2* (mudar o term da eleição de outro candidato?)
+      if my_replic.getState() == state.FOLLOWER then -- must be a follower
+        if not my_replic.hasVoted() then -- must not have voted this election
+          my_replic.grantVote()
+          vote_granted = true
+        end
+      end
+    end
+    -- TODO-V3-tests: O que deve acontecer no caso de duas eleições simultaneas??
+        -- Ex: No github -> Ambos os candidatos estão no mesmo Term -> replicas votam em que chegar primeiro
+        -- Ex2*: Candidatos estão em Terms diferentes -> escolhe quem estiver em maior term ou quem chegar primeiro ?
+    print("HERE3")
+
     return curr_term, vote_granted
   end,
 
@@ -55,6 +79,7 @@ local myobj = {
     local is_leader = true -- TODO: fix, this was used just for testing
     -- local my_replic = replic.newReplic(1 + my_port - 8000)
     local my_proxy = luarpc.createProxy(IP, my_port, arq_interface)
+    local myID = my_replic.getID()
     local proxies = {}
 
     for _,address in pairs(addresses) do
@@ -62,37 +87,41 @@ local myobj = {
       table.insert(proxies, luarpc.createProxy(address.ip, address.port, arq_interface))
     end
 
-    -- table.insert(proxies, luarpc.createProxy(IP, port, arq_interface))
-    -- print("\t\tHERE\t\t!!")
+    local heartbeat_timeout = 5 -- TODO: get a random valid time
+    local last_heartbeat_occurance = socket.gettime() -- TODO: get a random valid time
 
     while true do
-      local rand_wait_time = math.random(2) -- TODO: must be smaller than heartbets time
+      -- local rand_wait_time = math.random(4) -- TODO: must be smaller than heartbets time
+      local rand_wait_time = 5 -- TODO: must be smaller than heartbets time
       -- local heartbeat_timeout = math.random(7)
-      local heartbeat_timeout = 7
-      local last_heartbeat_occurance = socket.gettime() + 6
 
-      print(string.format("\t\t >>> [SRV%i] execute - before wait(%i) >>>",rand_wait_time,my_replic.getID()))
+
+      print(string.format("\t\t >>> [SRV%i] execute - before wait(%i) >>>",myID,rand_wait_time))
       luarpc.wait(rand_wait_time)
-      print(string.format("\t\t  <<< [SRV%i] execute - after wait(%i) <<<\n",rand_wait_time,my_replic.getID()))
+      print(string.format("\t\t  <<< [SRV%i] execute - after wait(%i) <<<\n",myID,rand_wait_time))
 
-      -- if my_replic.isLeader() then
-      --   my_proxy.appendEntries() -- send heartbeats
-      --
-      -- else
-      --   -- se nao recebeu nenhum heartbeat até o tempo limite, inicia pedido de votos
-      --   if heartbeat_timeout + socket.gettime() <= last_heartbeat_occurance then
-      --     my_replic.resetVotesCount() -- reset vote count from last term
-      --     my_replic.setState("c") -- set to candidate
-      --     my_replic.incTerm() -- vote for itself
-      --     for _,proxy in proxies do
-      --       local vote_granted = proxy.requestVotes(my_replic.getTerm(), my_replic.getID())
-      --       if vote_granted then my_replic.incVotesCount() end
-      --       -- TODO: should request vote for itself also?
-      --       -- treat_ack(ack)
-      --       -- check_if_is_leader(ack)
-      --     end
-      --   end
-      -- end
+      if my_replic.isLeader() then
+        my_proxy.appendEntries() -- send heartbeats
+
+      else
+        -- se nao recebeu nenhum heartbeat até o tempo limite, inicia pedido de votos
+        if socket.gettime() >= last_heartbeat_occurance + heartbeat_timeout then
+          print(string.format("\n\n\t\t  <<< [SRV%i] GOING TO REQUEST VOTES <<<\n",myID,rand_wait_time))
+
+          my_replic.resetVotesCount() -- reset vote count from last term
+          my_replic.setState("c") -- set to candidate
+          my_replic.incTerm() -- vote for itself
+          for _,proxy in pairs(proxies) do
+
+            local curr_term, vote_granted = proxy.requestVotes(my_replic.getTerm(), myID)
+            if vote_granted then my_replic.incVotesCount() end
+            if curr_term ~= my_replic.getTerm() then my_replic.setTerm(curr_term) end -- is it possible to change a term in the middle of an election
+          end
+
+          last_heartbeat_occurance = socket.gettime() -- TODO-testing: fix this (should not be here)!!
+
+        end
+      end
     end
   end
 }

@@ -75,24 +75,24 @@ local myobj = {
       luarpc.wait(rand_wait_time)
       print(string.format("\t\t  <<< [SRV%i] execute - after wait(%i) <<<\n",rand_wait_time,my_replic.getID()))
 
-      -- if my_replic.isLeader() then
-      --   my_proxy.appendEntries() -- send heartbeats
-      --
-      -- else
-      --   -- se nao recebeu nenhum heartbeat até o tempo limite, inicia pedido de votos
-      --   if heartbeat_timeout + socket.gettime() <= last_heartbeat_occurance then
-      --     my_replic.resetVotesCount() -- reset vote count from last term
-      --     my_replic.setState("c") -- set to candidate
-      --     my_replic.incTerm() -- vote for itself
-      --     for _,proxy in proxies do
-      --       local vote_granted = proxy.requestVotes(my_replic.getTerm(), my_replic.getID())
-      --       if vote_granted then my_replic.incVotesCount() end
-      --       -- TODO: should request vote for itself also?
-      --       -- treat_ack(ack)
-      --       -- check_if_is_leader(ack)
-      --     end
-      --   end
-      -- end
+      if my_replic.isLeader() then
+        my_proxy.appendEntries() -- send heartbeats
+
+      else
+        -- se nao recebeu nenhum heartbeat até o tempo limite, inicia pedido de votos
+        if heartbeat_timeout + socket.gettime() <= last_heartbeat_occurance then
+          my_replic.resetVotesCount() -- reset vote count from last term
+          my_replic.setState("c") -- set to candidate
+          my_replic.incTerm() -- vote for itself
+          for _,proxy in proxies do
+            local vote_granted = proxy.requestVotes(my_replic.getTerm(), my_replic.getID())
+            if vote_granted then my_replic.incVotesCount() end
+            -- TODO: should request vote for itself also?
+            -- treat_ack(ack)
+            -- check_if_is_leader(ack)
+          end
+        end
+      end
     end
   end
 }
