@@ -50,7 +50,7 @@ local myobj = {
 
     -- cases where vote is granted
     -- NOTE-BUG ? WHY This if clause doens't work without 'tonumber' ???
-    if tonumber(caTerm) > tonumber(curr_term) then -- candidate has a better rank
+    if tonumber(caTerm) > tonumber(curr_term) then -- candidate has a better rank -- BUG?
       print("HERE2")
       curr_term = caTerm -- TODO-V3-tests check if this assertion wont fail in case Ex2* (mudar o term da eleição de outro candidato?)
       if my_replic.getState() == state.FOLLOWER then -- must be a follower
