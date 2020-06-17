@@ -14,7 +14,7 @@ local arq_interface = "interface.lua"
 -- AppendEntries RPC
 -- RequestVote RPC
 
-local my_port = porta1
+local my_port = tonumber(arg[1])
 
 local addresses = {{ip = IP, port = porta0}}
 
@@ -29,6 +29,7 @@ local addresses = {{ip = IP, port = porta0}}
 
 
 local my_replic = replic.newReplic(1 + my_port - 8000)
+my_replic.printReplic()
 
 local myobj = {
   requestVotes = function (candidateTerm, candidateId)
@@ -56,9 +57,13 @@ local myobj = {
     local my_proxy = luarpc.createProxy(IP, my_port, arq_interface)
     local proxies = {}
 
-    for _,address in addresses do
+    for _,address in pairs(addresses) do
+      print(address, address.ip, address.port)
       table.insert(proxies, luarpc.createProxy(address.ip, address.port, arq_interface))
     end
+
+    -- table.insert(proxies, luarpc.createProxy(IP, port, arq_interface))
+    -- print("\t\tHERE\t\t!!")
 
     while true do
       local rand_wait_time = math.random(2) -- TODO: must be smaller than heartbets time
@@ -66,28 +71,28 @@ local myobj = {
       local heartbeat_timeout = 7
       local last_heartbeat_occurance = socket.gettime() + 6
 
-      print(string.format(" >>> [SRV2] execute - before wait(%i) >>>",rand_wait_time))
+      print(string.format("\t\t >>> [SRV%i] execute - before wait(%i) >>>",rand_wait_time,my_replic.getID()))
       luarpc.wait(rand_wait_time)
-      print(string.format(" <<< [SRV2] execute - after wait(%i) <<<\n",rand_wait_time))
+      print(string.format("\t\t  <<< [SRV%i] execute - after wait(%i) <<<\n",rand_wait_time,my_replic.getID()))
 
-      if my_replic.isLeader() then
-        my_proxy.appendEntries() -- send heartbeats
-
-      else
-        -- se nao recebeu nenhum heartbeat até o tempo limite, inicia pedido de votos
-        if heartbeat_timeout + socket.gettime() <= last_heartbeat_occurance then
-          my_replic.resetVotesCount() -- reset vote count from last term
-          my_replic.setState("c") -- set to candidate
-          my_replic.incTerm() -- vote for itself
-          for _,proxy in proxies do
-            local vote_granted = proxy.requestVotes(my_replic.getTerm(), my_replic.getID())
-            if vote_granted then my_replic.incVotesCount() end
-            -- TODO: should request vote for itself also?
-            -- treat_ack(ack)
-            -- check_if_is_leader(ack)
-          end
-        end
-      end
+      -- if my_replic.isLeader() then
+      --   my_proxy.appendEntries() -- send heartbeats
+      --
+      -- else
+      --   -- se nao recebeu nenhum heartbeat até o tempo limite, inicia pedido de votos
+      --   if heartbeat_timeout + socket.gettime() <= last_heartbeat_occurance then
+      --     my_replic.resetVotesCount() -- reset vote count from last term
+      --     my_replic.setState("c") -- set to candidate
+      --     my_replic.incTerm() -- vote for itself
+      --     for _,proxy in proxies do
+      --       local vote_granted = proxy.requestVotes(my_replic.getTerm(), my_replic.getID())
+      --       if vote_granted then my_replic.incVotesCount() end
+      --       -- TODO: should request vote for itself also?
+      --       -- treat_ack(ack)
+      --       -- check_if_is_leader(ack)
+      --     end
+      --   end
+      -- end
     end
   end
 }

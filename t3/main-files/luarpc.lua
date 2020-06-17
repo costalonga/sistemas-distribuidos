@@ -132,11 +132,11 @@ function luarpc.waitIncoming()
         for i = #awaiting_coroutines,1,-1 do
           if awaiting_coroutines[i].wait <= curr_time then
             local tmp_co = table.remove(awaiting_coroutines,i)
-            print("\t REMOVED AND RESUMING",tmp_co, tmp_co.co) -- [DEBUG]
+            print("\t   REMOVED AND RESUMING",tmp_co, tmp_co.co) -- [DEBUG]
   					-- TODO: Verificar se nao precisa fazer nada APOS o resume() (em todos o casos, chamada RPC, requestVotes, waitting...)
             coroutine.resume(tmp_co.co)
           else
-            print("\t NO MORE COROUTINES TO RESUME! STOPPED AT:",awaiting_coroutines[i], awaiting_coroutines[i].co, awaiting_coroutines[i].wait) -- [DEBUG]
+            print("\t   NO MORE COROUTINES TO RESUME! STOPPED AT:",awaiting_coroutines[i], awaiting_coroutines[i].co, awaiting_coroutines[i].wait) -- [DEBUG]
             break
           end
         end

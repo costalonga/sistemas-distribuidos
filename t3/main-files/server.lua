@@ -14,16 +14,19 @@ local arq_interface = "interface.lua"
 -- AppendEntries RPC
 -- RequestVote RPC
 
-local my_port = porta0
-local addresses = {{ip = IP, port = porta1}}
+local my_port = tonumber(arg[1])
+
+local addresses = {{ip = IP, port = porta0}}
+
 
 -- local addresses = {
---   {ip = IP, port = porta1},
+--   {ip = IP, port = porta0},
 --   {ip = IP, port = porta2},
 --   {ip = IP, port = porta3},
 --   {ip = IP, port = porta4}
 --   -- TODO: should have port0 also ???
 -- }
+
 
 local my_replic = replic.newReplic(1 + my_port - 8000)
 my_replic.printReplic()
@@ -35,7 +38,7 @@ local myobj = {
     local caTerm = candidateTerm
     local myID = my_replic.getID()
     local myterm = my_replic.getTerm()
-    print(string.format("[SVR1] myID=%i caID=%i | myTerm=%i caTerm=%i",myID,caID,myterm,caTerm))
+    print(string.format("[SVR2] myID=%i caID=%i | myTerm=%i caTerm=%i",myID,caID,myterm,caTerm))
     local curr_term
     local vote_granted
     return curr_term, vote_granted
@@ -54,19 +57,23 @@ local myobj = {
     local my_proxy = luarpc.createProxy(IP, my_port, arq_interface)
     local proxies = {}
 
-    for _,address in addresses do
+    for _,address in pairs(addresses) do
+      print(address, address.ip, address.port)
       table.insert(proxies, luarpc.createProxy(address.ip, address.port, arq_interface))
     end
 
+    -- table.insert(proxies, luarpc.createProxy(IP, port, arq_interface))
+    -- print("\t\tHERE\t\t!!")
+
     while true do
-      local rand_wait_time = math.random(1,4) -- TODO: must be smaller than heartbets time
+      local rand_wait_time = math.random(2) -- TODO: must be smaller than heartbets time
       -- local heartbeat_timeout = math.random(7)
       local heartbeat_timeout = 7
       local last_heartbeat_occurance = socket.gettime() + 6
 
-      print(string.format(" >>> [SRV1] execute - before wait(%i) >>>",rand_wait_time))
+      print(string.format("\t\t >>> [SRV%i] execute - before wait(%i) >>>",rand_wait_time,my_replic.getID()))
       luarpc.wait(rand_wait_time)
-      print(string.format(" <<< [SRV1] execute - after wait(%i) <<<\n",rand_wait_time))
+      print(string.format("\t\t  <<< [SRV%i] execute - after wait(%i) <<<\n",rand_wait_time,my_replic.getID()))
 
       -- if my_replic.isLeader() then
       --   my_proxy.appendEntries() -- send heartbeats
