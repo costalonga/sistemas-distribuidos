@@ -7,51 +7,61 @@ local states_enum = require("states_enum")
 
 local REPLIC = {}
 
-function REPLIC.newReplic(replicID)
-  local term = 0 -- starts at zero
+function REPLIC.newReplic(replicID, numReplics)
+  local curr_term = 0 -- starts at zero
   local id = replicID
   local state = states_enum.FOLLOWER -- every replic starts as a follower
   local votes_granted = 0
+  local num_replics = numReplics
+  local majority = math.ceil(numReplics/2)
+  local heartbeat_due = 0 -- TODO check if there's a better way to do this
 
-  -- TODO: Find a way to make each replic vote only in one candidate per election
-  local has_voted_this_term = false
-  local list_replics = {} -- TODO: Necessary?? class instance having access to every replic may solve this
-
-  local function convert_state(st)
-    local first_char = string.sub(st,1,1):lower()
-    if first_char == "f" then return states_enum.FOLLOWER
-    elseif first_char == "c" then return states_enum.CANDIDATE
-    elseif first_char == "l" then return states_enum.LEADER
-    else
-      print("replic.lua > [ERROR]: Replic's state must be 'Follower', 'Candidate' or 'Leader'")
-      return nil
-    end
-  end
+  -- local function convert_state(st)
+  --   local first_char = string.sub(st,1,1):lower()
+  --   if first_char == "f" then return states_enum.FOLLOWER
+  --   elseif first_char == "c" then return states_enum.CANDIDATE
+  --   elseif first_char == "l" then return states_enum.LEADER
+  --   else
+  --     print("replic.lua > [ERROR]: Replic's state must be 'Follower', 'Candidate' or 'Leader'")
+  --     return nil
+  --   end
+  -- end
 
   return {
     getID = function () return id end,
     getState = function () return state end,
-    setState = function (st) state = convert_state(st) end,
-    getTerm = function () return term end,
-    setTerm = function (t) term = t end,
-    incTerm = function () term = term + 1 end,
+    -- setState = function (st) state = convert_state(st) end, -- not needed
+    setState = function (st) state = st end,
+    getTerm = function () return curr_term end,
+    setTerm = function (term) curr_term = term end,
+    incTerm = function () curr_term = curr_term + 1 end,
     getVotesCount = function () return votes_granted end,
+    resetVotesCount = function () votes_granted = 0 end,
     isLeader = function () return state == states_enum.LEADER end,
 
-    hasVoted = function () return has_voted_this_term end, -- one vote per term, or per election timeout ?
-    grantVote = function () has_voted_this_term = true end,
 
-    resetVotesCount = function ()
-      votes_granted = 0
-      has_voted_this_term = false
+    -- TODO: TESTE THIS!!! (in case a server crashes)
+    updateReplicsNumber = function (n)
+      num_replics = n
+      majority = math.ceil(n/2)
     end,
+    decReplicsNumber = function ()
+      num_replics = num_replics - 1
+      majority = math.ceil(num_replics/2)
+    end,
+
 
     incVotesCount = function () -- TODO: assert replic won't receive more than N (num of replics) votes
       votes_granted = votes_granted + 1
+      if votes_granted >= majority then
+        print(string.format("[REP%i] term = %i won election with: %i votes",myID,curr_term,votes_granted)) -- [DEBUG]
+        return true -- won the election
+      end
+      return false
     end,
 
     printReplic = function ()
-      local info = string.format("\t > term = %s\n\t > id = %s\n\t > state = %s \n\t > votes = %s\n",term,id,state,votes_granted)
+      local info = string.format("\t > id = %s\n\t > curr_term = %s\n\t > state = %s \n\t > votes = %s\n",id,curr_term,state,votes_granted)
       print(info)
       return info
     end

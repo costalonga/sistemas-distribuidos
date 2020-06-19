@@ -54,7 +54,7 @@ function luarpc.createProxy(host, port, interface_path)
         proxy_stub.conn = luarpc.create_client_stub_conn(host, port, true)
         -- print("\n\t     >>> [cli] createProxy CASE 1", "\n") -- [DEBUG]
         local curr_co = coroutine.running()
-        print("\t     >>> CO RUNNING:", curr_co, "\n")
+        -- print("\t     >>> CO RUNNING:", curr_co, "\n") -- [DEBUG*]
 
         coroutines_by_socket[proxy_stub.conn] = curr_co -- registra na tabela
         table.insert(sockets_lst, proxy_stub.conn) -- insere no array do select
@@ -103,7 +103,7 @@ function luarpc.wait(seg)
     local wait_time = socket.gettime() + seg
     -- print("\t\tGONNA WAIT",seg,wait_time) -- [DEBUG]
     local curr_co = coroutine.running()
-    table.insert(awaiting_coroutines, 1, {co = curr_co, wait = wait_time}) -- insert at the beginning of the list
+    table.insert(awaiting_coroutines, 1, {co = curr_co, waitting = wait_time}) -- insert at the beginning of the list
     coroutine.yield()
   else
     print("ERROR: UNEXPECTED UNYIELDABLE COROUTINE")
@@ -119,7 +119,7 @@ function luarpc.waitIncoming()
     local curr_time = socket.gettime()
     local select_timeout
     if #awaiting_coroutines > 0 then
-      local first_time = awaiting_coroutines[#awaiting_coroutines].wait
+      local first_time = awaiting_coroutines[#awaiting_coroutines].waitting
       select_timeout = math.abs(first_time - curr_time) -- TODO: what to do here?
     else
       select_timeout = 0
@@ -130,7 +130,7 @@ function luarpc.waitIncoming()
       -- print("\n\n\t SELECT's ERR = ", err, "\n") -- [DEBUG]
       if err == "timeout" then
         for i = #awaiting_coroutines,1,-1 do
-          if awaiting_coroutines[i].wait <= curr_time then
+          if awaiting_coroutines[i].waitting <= curr_time then
             local tmp_co = table.remove(awaiting_coroutines,i)
             -- print("\t   REMOVED AND RESUMING",tmp_co, tmp_co.co) -- [DEBUG]
   					-- TODO: Verificar se nao precisa fazer nada APOS o resume() (em todos o casos, chamada RPC, requestVotes, waitting...)
@@ -188,17 +188,17 @@ function luarpc.waitIncoming()
             until msg == "-fim-"
           end)
 
-        print("\t >>> '[SVR] CO RESUME 1'- START",coroutine.status(co),co,sckt)
+        -- print("\t >>> '[SVR] CO RESUME 1'- START",coroutine.status(co),co,sckt) -- [DEBUG*]
         coroutine.resume(co, client, servant) -- inicia a corotina
-        print("\t >>> '[SVR] CO RESUME 2'- STOP",coroutine.status(co),co,sckt)
+        -- print("\t >>> '[SVR] CO RESUME 2'- STOP",coroutine.status(co),co,sckt) -- [DEBUG*]
 
       else                                                    -- client
         -- para cada cliente ativo... aplicar reumse() em corrotina indicada pela tabela global
         local co = coroutines_by_socket[sckt]
         if co ~= nil and coroutine.status(co) ~= "dead" then
-          print("\t >>> '[CLT] CO RESUME 1'- START",coroutine.status(co),co,sckt)
+          -- print("\t >>> '[CLT] CO RESUME 1'- START",coroutine.status(co),co,sckt) -- [DEBUG*]
           coroutine.resume(co)
-          print("\t >>> '[CLT] CO RESUME 2'- STOP",coroutine.status(co),co,sckt)
+          -- print("\t >>> '[CLT] CO RESUME 2'- STOP",coroutine.status(co),co,sckt) -- [DEBUG*]
         end
         if coroutine.status(co) == "dead" then
           luarpc.remove_socket(sckt) -- remove socket cliente do array do select()
