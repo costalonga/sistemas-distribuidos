@@ -18,12 +18,14 @@ function MARSHALL.convert_param(param, interface)
   elseif first_char == "{" then --    table
     local str_struct = param:sub(2,#param-1) -- get new array without first char
     value = MARSHALL.tostruct(str_struct, interface)
-  else --                             number
-    value = tonumber(param)
-    if math.type(value) == "integer" then
-      tmp_type = "int"
-    else
-      tmp_type = "double"
+  else --                       boolean or number 
+    if tonumber(param) then --        number
+      value = tonumber(param)
+      if math.type(value) == "integer" then
+        tmp_type = "int"
+      else
+        tmp_type = "double"
+      end
     end
   end
   return value, tmp_type
