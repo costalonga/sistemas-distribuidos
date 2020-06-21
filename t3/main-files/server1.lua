@@ -49,9 +49,11 @@ end
 local my_replic = replic.newReplic(1 + my_port - 8000, #addresses+1)
 my_replic.printReplic()
 
+
+-- Stub's methods list
 local myobj = {
   requestVotes = function (candidateTerm, candidateId)
-    print("TODO - RECEIVED VOTE REQUEST")
+    print("\nTODO - RECEIVED VOTE REQUEST")
     local myID = my_replic.getID()
     local curr_term = my_replic.getTerm()
     local vote_granted = false
@@ -77,12 +79,12 @@ local myobj = {
         vote_granted = true
       end
     end
-    print(curr_term, vote_granted)
-    return curr_term, vote_granted
+    print("\t\t >>> >>> [SRV%i] - RESULT:",curr_term, vote_granted)
+    return curr_term, tostring(vote_granted)
   end,
 
   appendEntries = function (leaderTerm, leaderId)
-    print("TODO - sending heartbeats...")
+    print("TODO - RECEIVED HEARBEAT REQUEST")
     local myID = my_replic.getID()
     local curr_term = my_replic.getTerm()
     local success = false
@@ -112,12 +114,12 @@ local myobj = {
       table.insert(proxies, luarpc.createProxy(address.ip, address.port, arq_interface))
     end
 
-    local heartbeat_timeout = 50 -- TODO: get a random valid time -- TODO começar testes com valores grandes
+    local heartbeat_timeout = 5 -- TODO: get a random valid time -- TODO começar testes com valores grandes
     local last_heartbeat_occurance = socket.gettime() -- TODO: get a random valid time
 
     while true do
       -- local rand_wait_time = math.random(4) -- TODO: must be smaller than heartbets time
-      local rand_wait_time = 0.02 -- TODO: must be smaller than heartbets time
+      local rand_wait_time = 0.05 -- TODO: must be smaller than heartbets time
       -- local heartbeat_timeout = math.random(7)
 
 
@@ -126,6 +128,7 @@ local myobj = {
       -- print(string.format("\t\t  <<< [SRV%i] execute - after wait(%s) <<<\n",myID,rand_wait_time))
 
       if my_replic.isLeader() then -- send heartbeats
+        print(string.format("\t\t >>>  [SRV%i] GOING TO REQUEST HEARBEATS <<<\n",myID,rand_wait_time))
         for _,proxy in pairs(proxies) do
           local curr_term, success = proxy.appendEntries(my_replic.getTerm(), myID)
           -- if success then ... end TODO: do something? -- NOTE: I think this would only be used if we were considering using the Log Entries...

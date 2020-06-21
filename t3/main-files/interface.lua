@@ -16,21 +16,17 @@ struct = {
 interface = {
   methods = {
     requestVotes = {
-      resulttype = "void",
+      resulttype = "boolean",
       args = {
-        {direction = "in", type = "string"},
-        {direction = "in", type = "string"}
-        -- {direction = "in", type = "string"},
-        -- {direction = "inout", type = "int"}
+        {direction = "inout", type = "int"},
+        {direction = "in", type = "int"}
       }
     },
     appendEntries = {
-      resulttype = "void",
+      resulttype = "boolean",
       args = {
-        {direction = "in", type = "string"},
-        {direction = "in", type = "string"}
-        -- {direction = "in", type = "string"},
-        -- {direction = "inout", type = "int"}
+        {direction = "inout", type = "int"},
+        {direction = "in", type = "int"}
       }
     },
     execute = {
