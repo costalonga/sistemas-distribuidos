@@ -51,7 +51,12 @@ function luarpc.createProxy(host, port, interface_path)
 
       -- abre nova conexao e envia request
       if coroutine.isyieldable() then -- coroutine-client
-        proxy_stub.conn = luarpc.create_client_stub_conn(host, port, true)
+        -- print("\n\t     >>> [cli] createProxy CASE 0", "\n") -- [DEBUG]
+        proxy_stub.conn, err = luarpc.create_client_stub_conn(host, port, true)
+        if err then
+          return err
+        end
+
         -- print("\n\t     >>> [cli] createProxy CASE 1", "\n") -- [DEBUG]
         local curr_co = coroutine.running()
         -- print("\t     >>> CO RUNNING:", curr_co, "\n") -- [DEBUG*]
@@ -76,7 +81,7 @@ function luarpc.createProxy(host, port, interface_path)
       -- espera pela resposta do request
       local returns = {}
       repeat
-        ack,err = proxy_stub.conn:receive() -- SERVER IS EXITING HERE
+        local ack, err = proxy_stub.conn:receive() -- SERVER IS EXITING HERE
         -- print("[receive loop]: ack,err = ",ack,err) -- [DEBUG]
         if err then
           print("[ERROR] Unexpected... cause:", err)
@@ -120,7 +125,7 @@ function luarpc.waitIncoming()
     local select_timeout
     if #awaiting_coroutines > 0 then
       local first_time = awaiting_coroutines[#awaiting_coroutines].waitting
-      select_timeout = math.abs(first_time - curr_time) -- TODO: what to do here?
+      select_timeout = math.abs(first_time - curr_time)
     else
       select_timeout = 0
     end
@@ -231,14 +236,21 @@ end
 
 -------------------------------------------------------------------------------- Auxiliary Functions
 function luarpc.create_client_stub_conn(host, port, timeout)
-  local conn = socket.connect(host, port)
+  local conn, err = socket.connect(host, port)
+
+  if err then
+    print("[__ERROR_CONN] Could not stablish connection... description:", err)
+    -- if err == "connection refused" then end
+    return nil, "__ERROR_CONN"
+  end
+
   conn:setoption("tcp-nodelay", true)
   if timeout ~= false then
     conn:settimeout(0) -- do not block  -- TODO TESTING
   end
   -- conn:setoption("keepalive", true)
   conn:setoption("reuseaddr", true)
-  return conn
+  return conn, err
 end
 
 function luarpc.remove_socket(sckt)
@@ -248,16 +260,6 @@ function luarpc.remove_socket(sckt)
       break
     end
   end
-  -- local status = false
-  -- elseif case == "s" then -- servant
-  --   for i,_ in pairs(servants_lst) do
-  --     if i == sckt then
-  --       servants_lst[i] = nil -- deleting key from table
-  --       status = true
-  --       break
-  --     end
-  --   end
-  -- end
 end
 
 function luarpc.check_which_socket(sckt, lst)
