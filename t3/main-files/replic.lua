@@ -67,7 +67,7 @@ function REPLIC.newReplic(replicID, numReplics)
     getLastBeat = function() return last_beat end,
     updateLastBeat = function () last_beat = socket.gettime() end,
     isHeartbeatOverdue = function (hbeat_timeout)
-      return socket.gettime() >= last_beat + hbeat_timeout
+      return socket.gettime() >= (last_beat + hbeat_timeout)
     end,
 
     -- TODO: TESTE THIS!!! (in case a server crashes)

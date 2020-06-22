@@ -12,6 +12,9 @@ local arq_interface = "interface.lua"
 local my_port = tonumber(arg[1])
 local n_replics = tonumber(arg[2])
 
+local HEARTBEAT_TIMEOUT = tonumber(arg[3])
+local WAIT_TIMEOUT = tonumber(arg[4])
+
 
 -- local addresses = {{ip = IP, port = porta1}}
 -- local porta0 = 8000
@@ -79,7 +82,7 @@ local myobj = {
       end
     end
     print("\t\t >>> >>> [SRV%i] - RESULT:",curr_term, vote_granted)
-    return curr_term, vote_granted
+    return curr_term, tostring(vote_granted)
   end,
 
   appendEntries = function (leaderTerm, leaderId)
@@ -120,22 +123,22 @@ local myobj = {
       table.insert(proxies, luarpc.createProxy(address.ip, address.port, arq_interface))
     end
 
-    local heartbeat_timeout = 7.5 -- TODO: get a random valid time -- TODO começar testes com valores grandes
+    local heartbeat_timeout = HEARTBEAT_TIMEOUT -- TODO: get a random valid time -- TODO começar testes com valores grandes
     -- local last_heartbeat_occurance = socket.gettime() -- TODO: get a random valid time
 
     while true do
       -- local rand_wait_time = math.random(4) -- TODO: must be smaller than heartbets time
-      local rand_wait_time = 0.1 -- TODO: must be smaller than heartbets time
+      local rand_wait_time = WAIT_TIMEOUT -- TODO: must be smaller than heartbets time
       -- local heartbeat_timeout = math.random(7)
 
       luarpc.wait(rand_wait_time)
 
       if my_replic.isLeader() then -- send heartbeats
-        print(string.format("\t\t >>>  [SRV%i] GOING TO REQUEST HEARBEATS <<<\n",myID,rand_wait_time))
+        print(string.format("\t >>>  [SRV%i] GOING TO REQUEST HEARBEATS <<<\n",myID,rand_wait_time))
         for _,proxy in pairs(proxies) do
           local curr_term, success = proxy.appendEntries(my_replic.getTerm(), myID)
           -- if success then ... end TODO: do something? -- NOTE: I think this would only be used if we were considering using the Log Entries...
-          print(string.format("\t\t >>>  [SRV%i] RECEIVED:",myID), curr_term, success, "<<<\n")
+          print(string.format("\t\t >>> >>> [SRV%i] RECEIVED:",myID), curr_term, success, "<<<\n")
           if curr_term > my_replic.getTerm() then
             my_replic.setTerm(curr_term)
             my_replic.setState(state.FOLLOWER) -- set to follower
@@ -167,7 +170,7 @@ local myobj = {
 
           -- ask for other votes
           for _,proxy in pairs(proxies) do
-            print(string.format("\t\t >>>  [SRV%i] GOING TO REQUEST VOTES <<<\n",myID))
+            print(string.format("\t >>>  [SRV%i] GOING TO REQUEST VOTES <<<\n",myID))
             local curr_term, vote_granted = proxy.requestVotes(my_replic.getTerm(), myID)
             print("\t\t >>>  [SRV1] RECEIVED VOTE #1!!!")
             print("\t\t\t >>> >>> currTerm = ",curr_term, type(curr_term))
