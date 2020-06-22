@@ -93,13 +93,20 @@ local myobj = {
 
     if tonumber(leaderTerm) >= tonumber(curr_term) then -- will only vote if candidate has a greater term (that implies that no replic can vote for more than one candidate in one term)
       success = true -- either is a new leader or old leader
+      my_replic.updateLastBeat()
+
+      -- TODO: verificar se isso pode fazer com que um leader mais antigo perca seu posto para uma replica que virou leader mais recentemente DE MESMO TERM (o que nao deveria acontecer)
+      if not my_replic.isFollower() then
+        my_replic.setState(state.FOLLOWER)
+      end
+
       if tonumber(leaderTerm) > tonumber(curr_term) then
         curr_term = leaderTerm
         my_replic.setTerm(curr_term) -- update current term
       end
     end
 
-    return curr_term, success
+    return curr_term, tostring(success)
   end,
 
   execute = function (addresses_lst) -- TODO: FIX, change back 'addresses_lst' -> 'addresses'
@@ -109,17 +116,19 @@ local myobj = {
     local myID = my_replic.getID()
     local proxies = {}
 
+    my_replic.updateLastBeat() -- todo here
+
     for _,address in pairs(addresses) do
       print(address, address.ip, address.port)
       table.insert(proxies, luarpc.createProxy(address.ip, address.port, arq_interface))
     end
 
-    local heartbeat_timeout = 7 -- TODO: get a random valid time -- TODO começar testes com valores grandes
+    local heartbeat_timeout = 17 -- TODO: get a random valid time -- TODO começar testes com valores grandes
     local last_heartbeat_occurance = socket.gettime() -- TODO: get a random valid time
 
     while true do
       -- local rand_wait_time = math.random(4) -- TODO: must be smaller than heartbets time
-      local rand_wait_time = 0.1 -- TODO: must be smaller than heartbets time
+      local rand_wait_time = 0.3 -- TODO: must be smaller than heartbets time
       -- local heartbeat_timeout = math.random(7)
 
 

@@ -105,7 +105,7 @@ local myobj = {
       end
     end
 
-    return curr_term, success
+    return curr_term, tostring(success)
   end,
 
   execute = function (addresses_lst) -- TODO: FIX, change back 'addresses_lst' -> 'addresses'
@@ -120,12 +120,12 @@ local myobj = {
       table.insert(proxies, luarpc.createProxy(address.ip, address.port, arq_interface))
     end
 
-    local heartbeat_timeout = 1.5 -- TODO: get a random valid time -- TODO começar testes com valores grandes
+    local heartbeat_timeout = 7.5 -- TODO: get a random valid time -- TODO começar testes com valores grandes
     -- local last_heartbeat_occurance = socket.gettime() -- TODO: get a random valid time
 
     while true do
       -- local rand_wait_time = math.random(4) -- TODO: must be smaller than heartbets time
-      local rand_wait_time = 0.01 -- TODO: must be smaller than heartbets time
+      local rand_wait_time = 0.1 -- TODO: must be smaller than heartbets time
       -- local heartbeat_timeout = math.random(7)
 
       luarpc.wait(rand_wait_time)
@@ -135,7 +135,7 @@ local myobj = {
         for _,proxy in pairs(proxies) do
           local curr_term, success = proxy.appendEntries(my_replic.getTerm(), myID)
           -- if success then ... end TODO: do something? -- NOTE: I think this would only be used if we were considering using the Log Entries...
-          print(string.format("\t\t >>>  [SRV%i] RECEIVED curr_term, success <<<\n",myID,rand_wait_time))
+          print(string.format("\t\t >>>  [SRV%i] RECEIVED:",myID), curr_term, success, "<<<\n")
           if curr_term > my_replic.getTerm() then
             my_replic.setTerm(curr_term)
             my_replic.setState(state.FOLLOWER) -- set to follower
@@ -173,7 +173,7 @@ local myobj = {
             print("\t\t\t >>> >>> currTerm = ",curr_term, type(curr_term))
             print("\t\t\t >>> >>> granted = ",vote_granted, type(vote_granted))
 
-            if vote_granted then
+            if vote_granted == "true" then
               local won_election = my_replic.incVotesCount()
               print(string.format("\t\t >>>  [SRV%i] RECEIVED VOTE #2!!! Count=%i <<<\n",myID, my_replic.getVotesCount()))
               if won_election then
