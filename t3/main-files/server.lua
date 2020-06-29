@@ -16,20 +16,6 @@ local HEARTBEAT_TIMEOUT = tonumber(arg[3])
 local WAIT_TIMEOUT = tonumber(arg[4])
 
 
--- local addresses = {{ip = IP, port = porta1}}
--- local porta0 = 8000
--- local porta1 = 8001
--- local porta2 = 8002
--- local porta3 = 8003
--- local porta4 = 8004
--- local addresses = {
---   {ip = IP, port = porta0},
---   {ip = IP, port = porta2},
---   {ip = IP, port = porta3},
---   {ip = IP, port = porta4}
--- }
-
-
 -- TODO: improve this
 local addresses = {}
 for i=0,n_replics-1 do
@@ -42,9 +28,9 @@ for i=#addresses,1,-1 do
 end
 
 print("ADDRESSES:")
-print(0,my_port,"\n")
+print("My port:",my_port,"\n")
 for i,j in pairs(addresses) do
-  print(i,j.port)
+  print("Other's:",j.port)
 end
 -- improve this
 
@@ -55,17 +41,17 @@ my_replic.printReplic()
 -- Stub's methods list
 local myobj = {
   requestVotes = function (candidateTerm, candidateId)
-    print("\nTODO - RECEIVED VOTE REQUEST")
     local myID = my_replic.getID()
     local curr_term = my_replic.getTerm()
     local vote_granted = false
 
-    print(string.format("\t\t >>> [SRV%i] - VOTE: myID=%i caID=%i | myterm=%i caTerm=%i",myID,myID,candidateId,curr_term,candidateTerm))
+    print(string.format(" >>> [SRV%i] - RECEIVED VOTE REQUEST: myID=%i caID=%i | myterm=%i caTerm=%i",myID,myID,candidateId,curr_term,candidateTerm))
 
     -- cases where vote is granted
     -- NOTE-BUG ? WHY This if clause doens't work without 'tonumber' ???
     -- "If a server receives a request with a stale (old) term number, it rejects the request."
     if tonumber(candidateTerm) > tonumber(curr_term) then -- will only vote if candidate has a greater term (that implies that no replic can vote for more than one candidate in one term)
+      vote_granted = true
       curr_term = candidateTerm
       my_replic.setTerm(curr_term) -- update current term
 
@@ -73,24 +59,19 @@ local myobj = {
       -- date, it immediately reverts to follower state.
       if not my_replic.isFollower() then
         my_replic.setState(state.FOLLOWER)
-        my_replic.resetVotesCount() -- XXX needed ?? XXX
-      end
-
-      if my_replic.getState() == state.FOLLOWER then
-        vote_granted = true
+        my_replic.updateLastBeat() -- "reset" heartbeat due so ex-leader/candidate doesnt start new election immediately
       end
     end
-    print("\t\t >>> >>> [SRV%i] - RESULT:",curr_term, vote_granted)
+    print(string.format(" >>> >>> [SRV%i] - RESULT:",myID),curr_term, vote_granted,"\n")
     return curr_term, tostring(vote_granted)
   end,
 
   appendEntries = function (leaderTerm, leaderId)
-    print("TODO - RECEIVED HEARBEAT REQUEST")
     local myID = my_replic.getID()
     local curr_term = my_replic.getTerm()
     local success = false
 
-    print(string.format("\t\t >>> [SRV%i] - HEARTBEAT: myID=%i ldID=%i | myTerm=%i ldTerm=%i",myID,myID,leaderId,curr_term,leaderTerm))
+    print(string.format(" >>> [SRV%i] - HEARTBEAT RECEIVED: myID=%i ldID=%i | myTerm=%i ldTerm=%i",myID,myID,leaderId,curr_term,leaderTerm))
 
     if tonumber(leaderTerm) >= tonumber(curr_term) then -- will only vote if candidate has a greater term (that implies that no replic can vote for more than one candidate in one term)
       success = true -- either is a new leader or old leader
@@ -122,38 +103,40 @@ local myobj = {
       table.insert(proxies, luarpc.createProxy(address.ip, address.port, arq_interface))
     end
 
-    local heartbeat_timeout = HEARTBEAT_TIMEOUT -- TODO: get a random valid time -- TODO começar testes com valores grandes
+    -- local heartbeat_timeout = HEARTBEAT_TIMEOUT -- TODO: get a random valid time
+    local heartbeat_timeout = replic.getRandomHeartbeatDue()
 
     while true do
       -- local rand_wait_time = math.random(4) -- TODO: must be smaller than heartbets time
-      local rand_wait_time = WAIT_TIMEOUT -- TODO: must be smaller than heartbets time
+      -- local rand_wait_time = WAIT_TIMEOUT -- TODO: must be smaller than heartbets time
       -- local heartbeat_timeout = math.random(7)
 
-      luarpc.wait(rand_wait_time)
 
+      -- Send Heartbeats
       if my_replic.isLeader() then -- send heartbeats
-        print(string.format("\t >>>  [SRV%i] GOING TO REQUEST HEARBEATS <<<\n",myID,rand_wait_time))
+        print(string.format("\n >>>  [SRV%i] GOING TO REQUEST HEARBEATS \t<<<",myID))
 
         for i=#proxies,1,-1 do
           local proxy = proxies[i]
           local ack, success = proxy.appendEntries(my_replic.getTerm(), myID)
-          -- if success then ... end TODO: do something? -- NOTE: I think this would only be used if we were considering using the Log Entries...
 
           if ack == "__ERROR_CONN" then -- TODO: Check if this is working... probably need more assertions because crash can happen anytime... this won't solve if server crashes after connection and before answering the request"
-            print(string.format("\t >>>  [SRV%i] FORGETTING REPLIC <<<\n",myID))
+            print(string.format(" >>>  [SRV%i] FORGETTING REPLIC\n",myID))
             table.remove(proxies,i)
             my_replic.decReplicsNumber() -- decrease the number of replics and update min_votes to become leader
 
           else
             local curr_term = ack
-            print(string.format("\t\t >>> >>> [SRV%i] RECEIVED:",myID), curr_term, success, "<<<\n")
+            print(string.format(" >>> >>> [SRV%i] RECEIVED:",myID), curr_term, success)
             if curr_term > my_replic.getTerm() then
               my_replic.setTerm(curr_term)
               my_replic.setState(state.FOLLOWER) -- set to follower
+              my_replic.updateLastBeat() -- "reset" heartbeat due so ex-leader/candidate doesn't start new election immediately
               break
             end
           end
         end
+      end
 
       --  TODO:  If election timeout elapses without receiving AppendEntries
       -- RPC from current leader or granting vote to candidate:
@@ -161,13 +144,17 @@ local myobj = {
 
       -- TODO NOW!!! Adicionar um tempo para recomeçar nova eleicao em caso de empate (acho que manter estado como candidato nao resolve)
 
-      else
+      -- Wait
+      luarpc.wait(replic.getRandomWait())
+
+      if not my_replic.isLeader() then
         -- se nao recebeu nenhum heartbeat até o tempo limite, inicia pedido de votos
         -- ou se ultima eleicao nao teve vencedor, precisa comecar uma nova -- TODO HERE CHECK WHAT TO DO IN THIS CASE
         if my_replic.isHeartbeatOverdue(heartbeat_timeout) then
-          -- print(string.format("\t\t >>>  [SRV%i] GOING TO REQUEST VOTES <<<\n",myID))
+          -- print(string.format(" >>>  [SRV%i] GOING TO REQUEST VOTES <<<\n",myID))
 
           -- TODO-V2: change 'votes_count' to local var, so it doenst need to control reset... ??
+          heartbeat_timeout = replic.getRandomHeartbeatDue()
 
           -- start election
           my_replic.resetVotesCount() -- reset vote count from last term
@@ -181,23 +168,19 @@ local myobj = {
           -- for _,proxy in pairs(proxies) do
             local proxy = proxies[i]
 
-            print(string.format("\t >>>  [SRV%i] GOING TO REQUEST VOTES <<<\n",myID))
+            print(string.format("\n >>> [SRV%i] GOING TO REQUEST VOTES \t<<<",myID))
             local ack, vote_granted = proxy.requestVotes(my_replic.getTerm(), myID)
 
             if ack == "__ERROR_CONN" then -- TODO: Check if this is working... probably need more assertions because crash can happen anytime... this won't solve if server crashes after connection and before answering the request"
-              print(string.format("\t >>>  [SRV%i] FORGETTING REPLIC <<<\n",myID))
+              print(string.format(" >>>  [SRV%i] FORGETTING REPLIC <<<\n",myID))
               table.remove(proxies,i)
               my_replic.decReplicsNumber() -- decrease the number of replics and update min_votes to become leader
 
             else
               local curr_term = ack
-              print("\t\t >>>  [SRV] RECEIVED VOTE #1!!!")
-              print("\t\t\t >>> >>> currTerm = ", curr_term, type(curr_term))
-              print("\t\t\t >>> >>> granted = ", vote_granted, type(vote_granted))
-
               if vote_granted == "true" then
                 local won_election = my_replic.incVotesCount()
-                print(string.format("\t\t >>>  [SRV%i] RECEIVED VOTE #2!!! Count=%i <<<\n",myID, my_replic.getVotesCount()))
+                print(string.format(" >>>  [SRV%i] RECEIVED VOTE!!! Count=%i\n",myID, my_replic.getVotesCount()))
                 if won_election then
                   my_replic.setState(state.LEADER) -- set to candidate
                   -- TODO: Checkout 'rand_wait_time' so elected leader go right after to AppendEntries()
@@ -210,7 +193,8 @@ local myobj = {
               if curr_term > my_replic.getTerm() then
                 my_replic.setTerm(curr_term)
                 my_replic.setState(state.FOLLOWER) -- set to follower
-                my_replic.resetVotesCount() -- XXX needed ?? XXX
+                my_replic.updateLastBeat()
+                -- my_replic.resetVotesCount() -- XXX needed ?? XXX
                 break
               end
 

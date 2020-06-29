@@ -8,11 +8,7 @@ local socket = require("socket")
 -- states_enum.LEADER = "leader"
 
 local function get_majority(n)
-  if n%2 == 0 then
-    return n/2 + 1
-  else
-    return math.ceil(n/2)
-  end
+  return math.floor(n/2)+1
 end
 
 local REPLIC = {}
@@ -70,7 +66,6 @@ function REPLIC.newReplic(replicID, numReplics)
       return socket.gettime() >= (last_beat + hbeat_timeout)
     end,
 
-    -- TODO: TESTE THIS!!! (in case a server crashes)
     -- Methods for when a replic crashes
     updateReplicsNumber = function (n)
       num_replics = n
@@ -88,6 +83,23 @@ function REPLIC.newReplic(replicID, numReplics)
       return info
     end
   }
+end
+
+function REPLIC.getRandomWait()
+  local range = math.random(1,4)
+  if range == 1 then
+    return math.random(10,25)/1000
+  elseif range == 2 then
+    return math.random(25,50)/1000
+  elseif range == 3 then
+    return math.random(50,75)/1000
+  else
+    return math.random(75,100)/1000
+  end
+end
+
+function REPLIC.getRandomHeartbeatDue()
+    return math.random(20,90)/10
 end
 
 return REPLIC
