@@ -32,7 +32,7 @@ interface = {
     execute = {
       resulttype = "void",
       args = {
-        {direction = "in", type = "addresses"}
+        {direction = "out", type = "void"}
       }
     }
   }

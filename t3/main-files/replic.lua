@@ -85,7 +85,8 @@ function REPLIC.newReplic(replicID, numReplics)
   }
 end
 
-function REPLIC.getRandomWait()
+function REPLIC.getRandomWait(replic_st)
+	-- todo math.randomseed(scoket.gettime() OR s.time())
   local range = math.random(1,4)
   if range == 1 then
     return math.random(10,25)/1000
@@ -99,7 +100,7 @@ function REPLIC.getRandomWait()
 end
 
 function REPLIC.getRandomHeartbeatDue()
-    return math.random(20,90)/10
+    return math.random(25,90)/100
 end
 
 return REPLIC
