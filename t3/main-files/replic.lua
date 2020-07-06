@@ -22,6 +22,9 @@ function REPLIC.newReplic(replicID, numReplics)
   local majority = get_majority(numReplics)
   local heartbeat_due = 0 -- TODO check if there's a better way to do this
   local last_beat = socket.gettime()
+  local seed = os.time()
+  math.randomseed(seed)
+
 
   -- local function convert_state(st)
   --   local first_char = string.sub(st,1,1):lower()
@@ -53,7 +56,7 @@ function REPLIC.newReplic(replicID, numReplics)
     incVotesCount = function () -- TODO: assert replic won't receive more than N (num of replics) votes
       votes_granted = votes_granted + 1
       if votes_granted >= majority then
-        print(string.format("[REP%i] term = %i won election with: %i votes",id,curr_term,votes_granted)) -- [DEBUG]
+        print(string.format("\n\t >>> [REP%i] term = %i won election with: %i votes!!!\n",id,curr_term,votes_granted)) -- [DEBUG]
         return true -- won the election
       end
       return false
@@ -61,9 +64,19 @@ function REPLIC.newReplic(replicID, numReplics)
 
     -- Heartbeat methods
     getLastBeat = function() return last_beat end,
-    updateLastBeat = function () last_beat = socket.gettime() end,
+    updateLastBeat = function ()
+      last_beat = socket.gettime()
+      -- print("\n\t >>> UPDATED LAST BEAT:", socket.gettime(), "\n")
+    end,
     isHeartbeatOverdue = function (hbeat_timeout)
-      return socket.gettime() >= (last_beat + hbeat_timeout)
+      return socket.gettime() > (last_beat + hbeat_timeout)
+    end,
+
+    printExpirationTime = function (hbeat_timeout)
+      local tmp = last_beat + hbeat_timeout
+      local now = socket.gettime()
+      -- print(string.format("Last Beat = %s | Time Now = %s | Heartbeat Due = %s",last_beat,now,tmp))
+      print(string.format(" > Time Now >= Last Beat + Timeout ? %s \t (remaining = %s)",now >= tmp, tmp-now), state)
     end,
 
     -- Methods for when a replic crashes
@@ -75,32 +88,19 @@ function REPLIC.newReplic(replicID, numReplics)
       num_replics = num_replics - 1
       majority = get_majority(num_replics)
     end,
+    getReplicsNumber = function () return num_replics end,
+
+    -- Wait Methods
+    getRandomWait = function () return math.random(1,10)/10 end,
+    getRandomHeartbeatDue = function () return math.random(30,40)/10 end,
 
     -- Aux methods
     printReplic = function ()
-      local info = string.format("\t > id = %s\n\t > curr_term = %s\n\t > state = %s \n\t > votes = %s\n\t > majority = %s\n",id,curr_term,state,votes_granted,majority)
+      local info = string.format("\t > id = %s\n\t > curr_term = %s\n\t > state = %s \n\t > votes = %s\n\t > majority = %s\n\t > seed = %s\n",id,curr_term,state,votes_granted,majority,tostring(seed))
       print(info)
       return info
     end
   }
-end
-
-function REPLIC.getRandomWait(replic_st)
-	-- todo math.randomseed(scoket.gettime() OR s.time())
-  local range = math.random(1,4)
-  if range == 1 then
-    return math.random(10,25)/1000
-  elseif range == 2 then
-    return math.random(25,50)/1000
-  elseif range == 3 then
-    return math.random(50,75)/1000
-  else
-    return math.random(75,100)/1000
-  end
-end
-
-function REPLIC.getRandomHeartbeatDue()
-    return math.random(25,90)/100
 end
 
 return REPLIC
