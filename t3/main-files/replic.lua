@@ -13,7 +13,7 @@ end
 
 local REPLIC = {}
 
-function REPLIC.newReplic(replicID, numReplics)
+function REPLIC.newReplic(replicID, numReplics, randomSeed)
   local curr_term = 0 -- starts at zero
   local id = replicID
   local state = states_enum.FOLLOWER -- every replic starts as a follower
@@ -22,9 +22,14 @@ function REPLIC.newReplic(replicID, numReplics)
   local majority = get_majority(numReplics)
   local heartbeat_due = 0 -- TODO check if there's a better way to do this
   local last_beat = socket.gettime()
-  local seed = os.time()
-  math.randomseed(seed)
+  local seed
 
+  if not randomSeed or type(randomSeed) ~= "number"then
+    seed = os.time()
+  else
+    seed = randomSeed
+  end
+  math.randomseed(seed)
 
   -- local function convert_state(st)
   --   local first_char = string.sub(st,1,1):lower()

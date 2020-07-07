@@ -12,7 +12,7 @@ local luarpc = {}
 local servants_lst = {} -- Table/Dict with -> servers_sockets.obj and servers_sockets.interface
 local sockets_lst = {} -- Array with all sockets
 local coroutines_by_socket = {} -- < socket:coroutine >
-local awaiting_coroutines = {} -- < coroutine:time > (coroutines sorted by awake time) -- [CHANGED]
+local awaiting_coroutines = {} -- < coroutine:time > (coroutines sorted by awake time)
 -- local clients_lst = {} -- Not being used any more
 
 -------------------------------------------------------------------------------- Auxiliary Functions
@@ -138,7 +138,6 @@ function luarpc.waitIncoming()
           if awaiting_coroutines[i].waitting <= curr_time then
             local tmp_co = table.remove(awaiting_coroutines,i)
             -- print("\t   REMOVED AND RESUMING",tmp_co, tmp_co.co) -- [DEBUG]
-  					-- TODO: Verificar se nao precisa fazer nada APOS o resume() (em todos o casos, chamada RPC, requestVotes, waitting...)
             coroutine.resume(tmp_co.co)
           else
             -- print("\t   NO MORE COROUTINES TO RESUME! STOPPED AT:",awaiting_coroutines[i], awaiting_coroutines[i].co, awaiting_coroutines[i].wait) -- [DEBUG]
@@ -174,8 +173,8 @@ function luarpc.waitIncoming()
                 print("[ERROR] Unexpected error occurred at waitIncoming... cause:", err)
                 if err == "closed" then
                   print("\t Server is down, closing connection!\n") -- [DEBUG]
-                  -- TODO forget connection
-  								-- TODO: VERIFICAR ERRO DE CONEXAO:
+                  -- TODO-Future-Work: forget connection
+  								-- TODO-Future-Work:: VERIFICAR ERRO DE CONEXAO:
   								--				-- caso um servant caia, outro server não vai ficar esperando infinitamente uma resposta da 'request_votes' e etc
   								-- 				-- logo, deve chegar um erro de "closed" dentro da SELECT (por aqui I GUESS), e ele deve ser tratado -> esquecer essa conexao
                 end

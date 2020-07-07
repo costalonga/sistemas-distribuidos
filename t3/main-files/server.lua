@@ -7,6 +7,9 @@ local arq_interface = "interface.lua"
 
 local my_port = tonumber(arg[1])
 local n_replics = tonumber(arg[2])
+local seed = tonumber(arg[3])
+local timeout = tonumber(arg[4])
+
 
 -- Build table with IP / Port from all replics
 local addresses = {}
@@ -26,7 +29,7 @@ for i,j in pairs(addresses) do
 end
 
 -- Remove replic's self IP and Port from table
-local my_replic = replic.newReplic(1 + my_port - 8000, #addresses+1)
+local my_replic = replic.newReplic(1 + my_port - 8000, #addresses+1, seed)
 my_replic.printReplic()
 
 
@@ -92,7 +95,13 @@ local myobj = {
       table.insert(proxies, luarpc.createProxy(address.ip, address.port, arq_interface))
     end
 
-    local heartbeat_timeout = my_replic.getRandomHeartbeatDue()
+    -- local heartbeat_timeout = my_replic.getRandomHeartbeatDue()
+    local heartbeat_timeout
+    if timeout ~= nil and type(timeout) == "number" then
+      heartbeat_timeout = timeout
+    else
+      heartbeat_timeout = my_replic.getRandomHeartbeatDue()
+    end
     my_replic.updateLastBeat()
 
     while true do
@@ -135,7 +144,7 @@ local myobj = {
 			if my_replic.isLeader() then
         luarpc.wait(my_replic.getRandomWait())
 			else
-        my_replic.printExpirationTime(heartbeat_timeout) -- [DEBUG]
+        -- my_replic.printExpirationTime(heartbeat_timeout) -- [DEBUG]
         luarpc.wait(heartbeat_timeout)
 			end
 
@@ -143,12 +152,9 @@ local myobj = {
       if not my_replic.isLeader() then
         -- se nao recebeu nenhum heartbeat até o tempo limite, inicia pedido de votos
         -- ou se ultima eleicao nao teve vencedor, precisa comecar uma nova
-        heartbeat_timeout = my_replic.getRandomHeartbeatDue()
 
         if my_replic.isHeartbeatOverdue(heartbeat_timeout) then
-
-					-- using heartbeat timeout as "election timeout"
-					my_replic.updateLastBeat() -- "reset" heartbeat due so replic doesn't start new election immediately, in case there's no winner
+          heartbeat_timeout = my_replic.getRandomHeartbeatDue()
 
           -- start election
           my_replic.resetVotesCount() -- reset vote count from last term
@@ -157,7 +163,7 @@ local myobj = {
           my_replic.incVotesCount() -- vote for itself
 
           -- ask for other votes
-          print(string.format("\n >>> [SRV%i] GOING TO REQUEST VOTES | Term: %i \t<<<",myID,my_replic.getTerm()))
+          print(string.format("\n >>> [SRV%i] STARTED AN ELECTION | Term: %i \t<<<",myID,my_replic.getTerm()))
           for i=#proxies,1,-1 do
             local proxy = proxies[i]
 
@@ -185,7 +191,6 @@ local myobj = {
                 my_replic.setTerm(curr_term)
                 my_replic.resetVotesCount()
                 my_replic.setState(state.FOLLOWER) -- set to follower
-                my_replic.updateLastBeat()
                 break
               end
             end
@@ -194,10 +199,11 @@ local myobj = {
 						-- acknowledge new leader, then it can stop requesting votes
 						if not my_replic.isCandidate() then
 							print(string.format(" >>>  [SRV%i] Received heartbeat from leader during election, so it will stop requesting votes\n",myID))
-              my_replic.updateLastBeat()
 							break
 						end
           end -- end for (loop to request votes)
+          -- using heartbeat timeout as "election timeout"
+					my_replic.updateLastBeat() -- "reset" heartbeat due so replic doesn't start new election immediately, in case there's no winner
         end
       end
     end
@@ -206,9 +212,6 @@ local myobj = {
 
 luarpc.createServant(myobj, "interface.lua", my_port)
 luarpc.waitIncoming()
-
-
-
 
 
 -- NOTE: Notes from Raft's Arctile:
