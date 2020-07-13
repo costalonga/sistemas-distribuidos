@@ -5,7 +5,7 @@
 local socket = require("socket")
 local validator = require("validator")
 local marshall = require("marshalling")
-print("LuaSocket version: " .. socket._VERSION)
+-- print("LuaSocket version: " .. socket._VERSION)
 
 local luarpc = {}
 -------------------------------------------------------------------------------- Main Data Structures
@@ -27,7 +27,7 @@ end
 -------------------------------------------------------------------------------- Main Functions
 function luarpc.createServant(obj, interface_path, port)
   local server = socket.try(socket.bind("*", port))
-  print("Server is running on port: " .. port)
+  -- print("Server is running on port: " .. port)
   table.insert(sockets_lst, server) -- insert at sockets_lst
   servants_lst[server] = {}
   servants_lst[server]["obj"] = obj
@@ -53,9 +53,11 @@ function luarpc.createProxy(host, port, interface_path)
       -- abre nova conexao e envia request
       if coroutine.isyieldable() then -- coroutine-client
         -- print("\n\t     >>> [cli] createProxy CASE 0", "\n") -- [DEBUG]
-        proxy_stub.conn, err = luarpc.create_client_stub_conn(host, port, true)
-        if err then
-          return err
+        local erro
+        proxy_stub.conn, erro = luarpc.create_client_stub_conn(host, port, true)
+        if erro then
+          print("[ERROR] Unexpected error at the end of 'createProxy', cause:", erro)
+          return erro
         end
 
         -- print("\n\t     >>> [cli] createProxy CASE 1", "\n") -- [DEBUG]
@@ -85,7 +87,7 @@ function luarpc.createProxy(host, port, interface_path)
         local ack, err = proxy_stub.conn:receive() -- SERVER IS EXITING HERE
         -- print("[receive loop]: ack,err = ",ack,err) -- [DEBUG]
         if err then
-          print("[ERROR] Unexpected... cause:", err)
+          print("[ERROR] Unexpected error at the end of 'createProxy', cause:", err)
           break
         end
         if ack ~= nil and ack ~= "-fim-" then
@@ -119,7 +121,7 @@ end
 
 function luarpc.waitIncoming()
 
-  print("Waiting for Incoming...")
+  -- print("Waiting for Incoming...")
   while true do
 
     local curr_time = socket.gettime()
@@ -160,6 +162,7 @@ function luarpc.waitIncoming()
         local client = assert(servant:accept()) -- ponta do socket do server p/ client
         add_new_client(client, servant)
         client:setoption("tcp-nodelay", true)
+        client:setoption("keepalive", true)
 
         -- cria nova corrotina e a invoca para fazer o receive
         local co = coroutine.create(
@@ -193,18 +196,20 @@ function luarpc.waitIncoming()
             until msg == "-fim-"
           end)
 
-        print("\t >>> '[SVR] CO RESUME 1'- START",coroutine.status(co),co,sckt) -- [DEBUG*]
+        -- print(" >>> '[SVR] CO RESUME 1'- START",coroutine.status(co),co,sckt) -- [DEBUG*]
         coroutine.resume(co, client, servant) -- inicia a corotina
-        print("\t >>> '[SVR] CO RESUME 2'- STOP",coroutine.status(co),co,sckt) -- [DEBUG*]
+        -- print(" >>> '[SVR] CO RESUME 2'- STOP",coroutine.status(co),co,sckt) -- [DEBUG*]
 
       else                                                    -- client
         -- para cada cliente ativo... aplicar reumse() em corrotina indicada pela tabela global
         local co = coroutines_by_socket[sckt]
+        -- print(" >>>>>>>> 1) ",co,type(co))
         if co ~= nil and coroutine.status(co) ~= "dead" then
-          print("\t >>> '[CLT] CO RESUME 1'- START",coroutine.status(co),co,sckt) -- [DEBUG*]
+          -- print(" >>> '[CLT] CO RESUME 1'- START",coroutine.status(co),co,sckt) -- [DEBUG*]
           coroutine.resume(co)
-          print("\t >>> '[CLT] CO RESUME 2'- STOP",coroutine.status(co),co,sckt) -- [DEBUG*]
+          -- print(" >>> '[CLT] CO RESUME 2'- STOP",coroutine.status(co),co,sckt) -- [DEBUG*]
         end
+        -- print(" >>>>>>>> 2) ",co,type(co))
         if coroutine.status(co) == "dead" then
           luarpc.remove_socket(sckt) -- remove socket cliente do array do select()
         end
@@ -248,7 +253,7 @@ function luarpc.create_client_stub_conn(host, port, timeout)
   if timeout ~= false then
     conn:settimeout(0) -- do not block  -- TODO TESTING
   end
-  -- conn:setoption("keepalive", true)
+  conn:setoption("keepalive", true)
   conn:setoption("reuseaddr", true)
   return conn, err
 end

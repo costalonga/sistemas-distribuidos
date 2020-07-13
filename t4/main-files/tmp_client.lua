@@ -9,18 +9,18 @@ local tipo = arg[3]
 local IP = "127.0.0.1"
 
 local p1 = luarpc.createProxy(IP, my_port, arq_interface)
-
+local myID = my_port - 8000
 
 -- local r, s = p1.insere(1, "k1", "v1")
 -- print("\n RES p1.execute = ",r, s, "\n")
 
 if tipo == "i" then
-  local r, s = p1.insere(3, "k3", "v3")
+  local r, s = p1.insere(myID, "melhorUni", "PUC-Rio")
   print("\n RES p1.insere = ",r, s, "\n")
 end
 
 if tipo == "c" then
-  local r, s = p1.consulta(1, 3, "k3")
+  local r, s = p1.consulta(1, myID, "melhorUni")
   print("\n RES p1.consulta = ",r,s, "\n")
 end
 
