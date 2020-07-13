@@ -54,9 +54,9 @@ end
 
 if (key ~= nil and val ~= nil) then
   local res = send_request(case, tipo, myID, key, val)
-  while res == nil do
-    print(string.format(" [RES %i %s]: ",case,tipo) .. "[___ERRORPC]: Unexpected error, probably because a coroutine was killed before sending back the ack of the request... attempting to process request again\n")
-    res = send_request(case, tipo, myID, key, val)
-  end
+  -- while res == nil do
+  --   print(string.format(" [RES %i %s]: ",case,tipo) .. "[___ERRORPC]: Unexpected error, probably because a coroutine was killed before sending back the ack of the request... attempting to process request again\n")
+  --   res = send_request(case, tipo, myID, key, val)
+  -- end -- *TODO UNCOMMENT
   print(string.format("[RES %i %s]: %s ",case,tipo,res))
 end

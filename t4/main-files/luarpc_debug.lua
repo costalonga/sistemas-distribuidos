@@ -52,7 +52,6 @@ function luarpc.createProxy(host, port, interface_path)
       -- assert parameters doesn't have errors
       local isValid, params, reasons = validator.validate_client(params,fname,fmethod.args)
       if not isValid and #reasons > 0 then
-        print("ERROR HERE", reasons)
         return "[ERROR]: Invalid request. Reason: \n" .. reasons
       end
 
@@ -92,10 +91,10 @@ function luarpc.createProxy(host, port, interface_path)
       -- espera pela resposta do request
       local returns = {}
       repeat
-        local ack, err = proxy_stub.conn:receive() -- SERVER IS EXITING HERE
+        local ack, err = proxy_stub.conn:receive() -- NOTE: Sometimes receiving connection error (cause: closed) here... shouldn't happen
         -- print("[receive loop]: ack,err = ",ack,err) -- [DEBUG]
         if err then
-          print(string.format("[ERROR] Unexpected error at the end of 'createProxy', while receiving response of request, cause: %s", err))
+          print(string.format("[ERROR - os.time=%s] Unexpected error at the end of 'createProxy', while receiving response of request, cause: %s",os.time(), err))
           break
         end
         if ack ~= nil and ack ~= "-fim-" then
@@ -135,7 +134,7 @@ function luarpc.waitIncoming()
     local curr_time = socket.gettime()
     local select_timeout
     if #awaiting_coroutines > 0 then
-      -- print(string.format(" \t\t >>>> [HERE] Number of awaiting coroutines: %i",#awaiting_coroutines)) -- [DEBUG]
+      -- print(string.format(" \t\t >>> Number of awaiting coroutines: %i",#awaiting_coroutines)) -- [DEBUG]
       local first_time = awaiting_coroutines[#awaiting_coroutines].waitting
       select_timeout = math.abs(first_time - curr_time)
     else
@@ -144,19 +143,19 @@ function luarpc.waitIncoming()
 
     local recvt, tmp, err = socket.select(sockets_lst, nil, select_timeout)
     if err ~= nil and #awaiting_coroutines > 0 then
-      -- print("\n\n \t\t >>>> [HERE] SELECT's ERR = ", err, "\n") -- [DEBUG]
       if err == "timeout" then
         for i = #awaiting_coroutines,1,-1 do
           if awaiting_coroutines[i].waitting <= curr_time then
             local tmp_co = table.remove(awaiting_coroutines,i)
-            -- print("\t\t >>>> [HERE]  REMOVED AND RESUMING",tmp_co, tmp_co.co) -- [DEBUG]
+            -- print("\t\t >>>>  REMOVED AND RESUMING",tmp_co, tmp_co.co) -- [DEBUG]
             coroutine.resume(tmp_co.co)
           else
-            -- print(string.format("\t\t >>>> [HERE]  NO MORE COROUTINES TO RESUME! STOPPED AT:",awaiting_coroutines[i], awaiting_coroutines[i].co, awaiting_coroutines[i].waitting) -- [DEBUG]
+            -- print("\t\t >>>> NO MORE COROUTINES TO RESUME! STOPPED AT:",awaiting_coroutines[i], awaiting_coroutines[i].co, awaiting_coroutines[i].waitting) -- [DEBUG]
             break
           end
         end
       else
+        print("\n\n\t SELECT's ERR = ", err, "\n") -- [DEBUG]
         print("[ERROR] Unexpected error occurred at waitIncoming... cause:", err) -- [DEBUG]
       end
     end
@@ -195,6 +194,7 @@ function luarpc.waitIncoming()
               if msg then
                 if msg == "-fim-" then
                   local result = luarpc.process_request(client, request_raw, servant)
+                  print(string.format("\n >> >> [SVR - os.time=%s] GONNA SEND ANSWER: %s",os.time(), result, "\n")) -- TODO HERE
                   client:send(result) -- SERVER envia resultado de volta para CLIENT
                   client:close() -- como server ja processou totalmente o request fecha essa ponta do socket
                 else
@@ -204,20 +204,20 @@ function luarpc.waitIncoming()
             until msg == "-fim-"
           end)
 
-        print(string.format(" >>> '[SVR] CO RESUME 1'- START",os.time()),coroutine.status(co),co,sckt) -- [DEBUG*]
+        print(string.format(" >>> '[SVR - os.time=%s] CO RESUME 1'- START",os.time()),coroutine.status(co),co,sckt) -- [DEBUG*]
         coroutine.resume(co, client, servant) -- inicia a corotina
-        print(string.format(" >>> '[SVR] CO RESUME 2'- STOP",os.time()),coroutine.status(co),co,sckt) -- [DEBUG*]
+        print(string.format(" >>> '[SVR - os.time=%s] CO RESUME 2'- STOP",os.time()),coroutine.status(co),co,sckt) -- [DEBUG*]
 
       else                                                    -- client
         -- para cada cliente ativo... aplicar reumse() em corrotina indicada pela tabela global
         local co = coroutines_by_socket[sckt]
         if co ~= nil and coroutine.status(co) ~= "dead" then
-          print(string.format(" >>> '[CLT] CO RESUME 1'- START",os.time()),coroutine.status(co),co,sckt) -- [DEBUG*]
+          print(string.format(" >>> '[CLT - os.time=%s] CO RESUME 1'- START",os.time()),coroutine.status(co),co,sckt) -- [DEBUG*]
           coroutine.resume(co)
-          print(string.format(" >>> '[CLT] CO RESUME 2'- STOP",os.time()),coroutine.status(co),co,sckt) -- [DEBUG*]
+          print(string.format(" >>> '[CLT - os.time=%s] CO RESUME 2'- STOP",os.time()),coroutine.status(co),co,sckt) -- [DEBUG*]
         end
         if co == nil or coroutine.status(co) == "dead" then
-          -- print("\t #3 CLIENT-CO Status dead or nil) ",co,sckt)
+          print("\t #3 CLIENT-CO Status dead or nil) ",co,sckt)
           luarpc.remove_socket(sckt) -- remove socket cliente do array do select()
         end
       end -- end if

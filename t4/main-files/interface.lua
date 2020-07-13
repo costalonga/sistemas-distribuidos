@@ -16,7 +16,7 @@ struct = {
 interface = {
   methods = {
     insere = {
-      resulttype = "boolean",
+      resulttype = "string",
       args = {
         {direction = "in", type = "int"},
         {direction = "in", type = "string"},
@@ -30,12 +30,6 @@ interface = {
         {direction = "in", type = "int"},
         {direction = "in", type = "string"}
         -- {direction = "out", type = "void"}
-      }
-    },
-    execute = {
-      resulttype = "void",
-      args = {
-        {direction = "out", type = "void"}
       }
     }
   }

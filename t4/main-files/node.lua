@@ -2,7 +2,7 @@ local socket = require("socket")
 
 local NODE = {}
 
-function NODE.newNode(nodeID, numNodes)
+function NODE.newNode(nodeID, numNodes, debugLevel)
   local my_id = nodeID
   local port = nodePort
   local num_nodes = numNodes
@@ -21,7 +21,15 @@ function NODE.newNode(nodeID, numNodes)
     table.insert(edges, neighbor_id)
     table.insert(dist_ranges, exp2i)
   end
-  math.randomseed(os.time())
+  log_msg = log_msg .. "\n\n"
+
+
+  if debugLevel == "v" then
+    random_method = function () return 5 end
+  else
+    math.randomseed(os.time())
+    random_method = function () return math.random(1,10)/10 end
+  end
 
   return {
     -- Basic methods
@@ -49,9 +57,11 @@ function NODE.newNode(nodeID, numNodes)
       return bkey % mod2n
     end,
 
+
     getLogMsg = function () return log_msg end,
-    getRandomWait = function () return math.random(1,10)/10 end
-    -- getRandomWait = function () return 1 end
+    -- getRandomWait = function () return math.random(1,10)/10 end
+    -- getRandomWait = function () return math.random(2,3) end
+    getRandomWait = random_method
   }
 end
 
