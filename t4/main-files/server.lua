@@ -37,10 +37,9 @@ local myobj = {
     local destID = my_node.calc_hash(key)
     if destID == myID then
       my_node.insertData(key,value)
-      local log = string.format("\t Par <%s : %s> enviado ao nó %i foi armazenado no nó %i", key, value, init_node, destID)
+      local log = string.format("\t Par <%s : %s> enviado ao nó %i: foi armazenado no nó %i", key, value, init_node, destID)
       print(log .. "\n")
       return log
-      -- return string.format("\t Inseriu par <%s : %s> no node %i",key,value,myID)
     else
       local nextID = my_node.findNext(destID)
       local proxy = proxies[nextID]
@@ -65,7 +64,6 @@ local myobj = {
       -- print(string.format("\t >>> [node %i] - RETURN QUERY #%i RESULT = ",myID, query_id),value)
       print(log .. "\n")
       return log
-      -- return string.format("\t Consulta %i enviada ao nó %i: valor para '%s' armazenado no nó %i: '%s'",query_id, init_node, key, destID, value)
     else
       local nextID = my_node.findNext(destID)
       local proxy = proxies[nextID]

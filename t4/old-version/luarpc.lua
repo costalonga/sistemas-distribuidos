@@ -5,7 +5,7 @@
 local socket = require("socket")
 local validator = require("validator")
 local marshall = require("marshalling")
--- print("LuaSocket version: " .. socket._VERSION)
+print("LuaSocket version: " .. socket._VERSION)
 
 local luarpc = {}
 -------------------------------------------------------------------------------- Main Data Structures
@@ -26,16 +26,8 @@ end
 
 -------------------------------------------------------------------------------- Main Functions
 function luarpc.createServant(obj, interface_path, port)
-  -- local server, err = socket.try(socket.bind("*", port))
-  local server, err = socket.bind("*", port)
-  if server == nil then
-    local err_msg = string.format("\n  [___ERROR_SOCKET] Could not connect to port: %i.",port)
-    err_msg = err_msg .. string.format("  Please check if are other processes running on this port before trying to run this program again.\n")
-    err_msg = err_msg .. string.format("  Use command: 'lsof -t -i:%i -sTCP:LISTEN' to check if there's any PID related to this port\n",port)
-    print(err_msg)
-    server, err = socket.try(socket.bind("*", port))
-  end
-  -- print("Server is running on port: " .. port)
+  local server = socket.try(socket.bind("*", port))
+  print("Server is running on port: " .. port)
   table.insert(sockets_lst, server) -- insert at sockets_lst
   servants_lst[server] = {}
   servants_lst[server]["obj"] = obj
@@ -87,7 +79,7 @@ function luarpc.createProxy(host, port, interface_path)
       end
 
       -- print("\n\t\t >>>>>> [cli] WAITING TO RECEIVE!!!") -- [DEBUG]
-      coroutines_by_socket[proxy_stub.conn] = nil -- desregistra da tabela -- TODO: BUG? Ao remover da tabela assim, corrotina pode se perder... como remover da tabela de outra forma?
+      -- coroutines_by_socket[proxy_stub.conn] = nil -- desregistra da tabela -- TODO HERE BUG? TEST
 
       -- espera pela resposta do request
       local returns = {}
@@ -129,7 +121,7 @@ end
 
 function luarpc.waitIncoming()
 
-  -- print("Waiting for Incoming...")
+  print("Waiting for Incoming...")
   while true do
 
     local curr_time = socket.gettime()
@@ -204,22 +196,21 @@ function luarpc.waitIncoming()
             until msg == "-fim-"
           end)
 
-        print(" >>> '[SVR] CO RESUME 1'- START",coroutine.status(co),co,sckt) -- [DEBUG*]
+        print("\t >>> '[SVR] CO RESUME 1'- START",coroutine.status(co),co,sckt) -- [DEBUG*]
         coroutine.resume(co, client, servant) -- inicia a corotina
-        print(" >>> '[SVR] CO RESUME 2'- STOP",coroutine.status(co),co,sckt) -- [DEBUG*]
+        print("\t >>> '[SVR] CO RESUME 2'- STOP",coroutine.status(co),co,sckt) -- [DEBUG*]
 
       else                                                    -- client
         -- para cada cliente ativo... aplicar reumse() em corrotina indicada pela tabela global
         local co = coroutines_by_socket[sckt]
+        -- print("\t >>>>>>>> 1) ",co,type(co))
         if co ~= nil and coroutine.status(co) ~= "dead" then
-          -- print("\t #1 CLIENT-CO Status right after select, BEFORE RESUME) ",co,type(co), coroutine.status(co))
-          print(" >>> '[CLT] CO RESUME 1'- START",coroutine.status(co),co,sckt) -- [DEBUG*]
+          print("\t >>> '[CLT] CO RESUME 1'- START",coroutine.status(co),co,sckt) -- [DEBUG*]
           coroutine.resume(co)
-          -- print("\t #2 CLIENT-CO Status right after select, AFTER RESUME) ",co,type(co), coroutine.status(co))
-          print(" >>> '[CLT] CO RESUME 2'- STOP",coroutine.status(co),co,sckt) -- [DEBUG*]
+          print("\t >>> '[CLT] CO RESUME 2'- STOP",coroutine.status(co),co,sckt) -- [DEBUG*]
         end
+        -- print("\t >>>>>>>> 2) ",co,type(co))
         if co == nil or coroutine.status(co) == "dead" then
-          print("\t #3 CLIENT-CO Status dead or nil) ",co,type(co), coroutine.status(co))
           luarpc.remove_socket(sckt) -- remove socket cliente do array do select()
         end
       end -- end if
