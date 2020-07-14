@@ -21,10 +21,9 @@ function NODE.newNode(nodeID, numNodes, debugLevel)
     table.insert(edges, neighbor_id)
     table.insert(dist_ranges, exp2i)
   end
-  log_msg = log_msg .. "\n\n"
-
 
   if debugLevel == "v" then
+    log_msg = log_msg .. "\n\n"
     random_method = function () return 5 end
   else
     math.randomseed(os.time())

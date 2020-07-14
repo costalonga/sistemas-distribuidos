@@ -87,7 +87,7 @@ function luarpc.createProxy(host, port, interface_path)
       end
 
       -- print("\n\t\t >>>>>> [cli] WAITING TO RECEIVE!!!") -- [DEBUG]
-      coroutines_by_socket[proxy_stub.conn] = nil -- desregistra da tabela -- TODO: BUG? Ao remover da tabela assim, corrotina pode se perder... como remover da tabela de outra forma?
+      coroutines_by_socket[proxy_stub.conn] = nil -- desregistra da tabela
 
       -- espera pela resposta do request
       local returns = {}
@@ -204,17 +204,17 @@ function luarpc.waitIncoming()
             until msg == "-fim-"
           end)
 
-        print(string.format(" >>> '[SVR] CO RESUME 1'- START",os.time()),coroutine.status(co),co,sckt) -- [DEBUG*]
+        -- print(string.format(" >>> '[SVR] CO RESUME 1'- START",os.time()),coroutine.status(co),co,sckt) -- [DEBUG*]
         coroutine.resume(co, client, servant) -- inicia a corotina
-        print(string.format(" >>> '[SVR] CO RESUME 2'- STOP",os.time()),coroutine.status(co),co,sckt) -- [DEBUG*]
+        -- print(string.format(" >>> '[SVR] CO RESUME 2'- STOP",os.time()),coroutine.status(co),co,sckt) -- [DEBUG*]
 
       else                                                    -- client
         -- para cada cliente ativo... aplicar reumse() em corrotina indicada pela tabela global
         local co = coroutines_by_socket[sckt]
         if co ~= nil and coroutine.status(co) ~= "dead" then
-          print(string.format(" >>> '[CLT] CO RESUME 1'- START",os.time()),coroutine.status(co),co,sckt) -- [DEBUG*]
+          -- print(string.format(" >>> '[CLT] CO RESUME 1'- START",os.time()),coroutine.status(co),co,sckt) -- [DEBUG*]
           coroutine.resume(co)
-          print(string.format(" >>> '[CLT] CO RESUME 2'- STOP",os.time()),coroutine.status(co),co,sckt) -- [DEBUG*]
+          -- print(string.format(" >>> '[CLT] CO RESUME 2'- STOP",os.time()),coroutine.status(co),co,sckt) -- [DEBUG*]
         end
         if co == nil or coroutine.status(co) == "dead" then
           -- print("\t #3 CLIENT-CO Status dead or nil) ",co,sckt)
@@ -258,7 +258,7 @@ function luarpc.create_client_stub_conn(host, port, timeout)
 
   conn:setoption("tcp-nodelay", true)
   if timeout ~= false then
-    conn:settimeout(0) -- do not block  -- TODO TESTING
+    conn:settimeout(0) -- do not block
   end
   conn:setoption("keepalive", true)
   conn:setoption("reuseaddr", true)

@@ -43,7 +43,7 @@ end
 local myobj = {
 
   insere = function(init_node, key, value)
-    -- print(string.format("\t >>> >>> [node %i] - RECEIVED INSERT REQUEST (init:%i k:%s v:%s)\t",myID,init_node,key,value))
+    print(string.format("\t >>> >>> [node %i] - RECEIVED INSERT REQUEST (init:%i k:%s v:%s)\t",myID,init_node,key,value))
     local destID = my_node.calc_hash(key)
     if destID == myID then
       my_node.insertData(key,value)
@@ -54,32 +54,31 @@ local myobj = {
       local nextID = my_node.findNext(destID)
       local proxy = proxies[nextID]
       local ack = proxy.insere(init_node,key,value)
-      if debug_level == "v" then print(string.format("\t >>> >>> [node %i] - INSERT REQUEST (init:%i k:%s v:%s) | Ack: %s ",myID,init_node,key,value,ack)) end
+      print(string.format("\t >>> >>> [node %i] - INSERT REQUEST (init:%i k:%s v:%s) | Ack: %s ",myID,init_node,key,value,ack))
       return ack
     end
   end,
 
   consulta = function(query_id, init_node, key)
-    if debug_level == "v" then print(string.format("\t >>> >>> [node %i] - RECEIVED QUERY REQUEST: queryID:%i init:%i k:%s\t",myID, query_id,init_node,key)) end
+    print(string.format("\t >>> >>> [node %i] - RECEIVED QUERY REQUEST: queryID:%i init:%i k:%s\t",myID, query_id,init_node,key))
     local destID = my_node.calc_hash(key)
     if destID == myID then
       local value
       repeat
         value = my_node.getValue(key)
         if value == nil then
-          if debug_level == "v" then print(string.format("\t >>> >>> [node %i] - QUERYID %i WAITING FOR VALUE TO BE INSERTED",myID, query_id)) end
+          print(string.format("\t >>> >>> [node %i] - QUERYID %i WAITING FOR VALUE TO BE INSERTED",myID, query_id))
           luarpc.wait(my_node.getRandomWait())
         end
       until value ~= nil
       local log = string.format("\t Consulta %i enviada ao nó %i: valor para '%s' armazenado no nó %i: '%s'",query_id, init_node, key, destID, value)
-      if debug_level == "v" then print(string.format("\t >>> >>> [node %i] - RETURN QUERY #%i RESULT = ",myID, query_id),value) end
       print(string.format("\t >>> >>> [node %i]",myID) .. log .. "\n")
       return log
     else
       local nextID = my_node.findNext(destID)
       local proxy = proxies[nextID]
       local ack = proxy.consulta(query_id,init_node,key)
-      if debug_level == "v" then print(string.format("\t >>> >>> [node %i] - QUERY REQUEST (init:%i k:%s) | Ack: %s ",myID,init_node,key,ack)) end
+      print(string.format("\t >>> >>> [node %i] - QUERY REQUEST (init:%i k:%s) | Ack: %s ",myID,init_node,key,ack))
       return ack
     end
   end
